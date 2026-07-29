@@ -1,0 +1,13 @@
+{
+  "name": "docker-interactor",
+  "version": "1.0.0",
+  "description": "Standalone module to interact with Docker API via Unix Socket",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "express": "^5.2.1"
+  }
+}
