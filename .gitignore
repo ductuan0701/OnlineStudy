@@ -1,6 +1,8 @@
 # Security / Environment Secrets
 .env
 .env.*
+nginx/ssl/*.key
+nginx/ssl/*.crt
 
 # OS generated files
 .DS_Store
