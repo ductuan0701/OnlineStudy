@@ -6,7 +6,7 @@ const exec = util.promisify(require('child_process').exec);
 const app = express();
 const PORT = process.env.PORT || 9000;
 const SECRET_TOKEN = process.env.SECRET_TOKEN || 'my-secret';
-const PROJECT_DIR = '/app/online-study'; // Đường dẫn đã mount từ máy Host vào Container
+const PROJECT_DIR = '/root/online-study'; // Đường dẫn phải giống hệt trên Host (Docker out of Docker)
 
 /**
  * HÀM MAIN ĐIỀU PHỐI (ORCHESTRATOR)
