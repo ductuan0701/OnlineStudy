@@ -4,7 +4,7 @@ const express = require('express');
 
 // Cấu hình axios kết nối thẳng vào Docker Unix Socket
 const dockerAPI = axios.create({
-  baseURL: 'http://localhost/v1.41', // Bắt buộc phải có host ảo, traffic sẽ đi qua socket
+  baseURL: 'http://localhost', // Bỏ fix cứng version để Docker Daemon tự dùng bản native
   httpAgent: new http.Agent({ socketPath: '/var/run/docker.sock' })
 });
 
@@ -39,7 +39,8 @@ async function pullImage(imageName) {
       response.data.on('error', err => reject(err));
     });
   } catch (error) {
-    console.error('❌ Lỗi khi pull image:', error.message);
+    const errorMsg = (error.response && error.response.data) ? error.response.data : error.message;
+    console.error('❌ Lỗi khi pull image:', errorMsg);
     throw error;
   }
 }
