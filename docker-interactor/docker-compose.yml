@@ -7,7 +7,9 @@ services:
       - "9000:9000"
     environment:
       - PORT=9000
-      - SECRET_TOKEN=my-secret
+      - SECRET_TOKEN=${WEBHOOK_TOKEN}
+    env_file:
+      - .env
     volumes:
       # Mount quyền truy cập Docker Daemon từ máy host vào container
       - /var/run/docker.sock:/var/run/docker.sock

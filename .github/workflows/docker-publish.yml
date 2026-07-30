@@ -91,4 +91,4 @@ jobs:
     steps:
       - name: Trigger Auto Deploy Webhook
         run: |
-          curl -X POST "http://${{ secrets.VPS_HOST }}:9000/webhook?token=my-secret"
+          curl -X POST "http://${{ secrets.VPS_HOST }}:9000/webhook?token=${{ secrets.WEBHOOK_TOKEN }}"

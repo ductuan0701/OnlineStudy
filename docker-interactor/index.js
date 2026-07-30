@@ -5,7 +5,11 @@ const exec = util.promisify(require('child_process').exec);
 // Cấu hình Express Webhook
 const app = express();
 const PORT = process.env.PORT || 9000;
-const SECRET_TOKEN = process.env.SECRET_TOKEN || 'my-secret';
+const SECRET_TOKEN = process.env.SECRET_TOKEN;
+if (!SECRET_TOKEN) {
+  console.error("🚨 LỖI BẢO MẬT: Bạn chưa cấu hình biến môi trường SECRET_TOKEN trong file .env!");
+  process.exit(1); // Ép buộc tắt ứng dụng nếu không có mật khẩu
+}
 const PROJECT_DIR = '/root/online-study'; // Đường dẫn phải giống hệt trên Host (Docker out of Docker)
 
 /**

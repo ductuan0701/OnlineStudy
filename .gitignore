@@ -1,6 +1,7 @@
 # Security / Environment Secrets
 .env
 .env.*
+docker-interactor/.env
 nginx/ssl/*.key
 nginx/ssl/*.crt
 
