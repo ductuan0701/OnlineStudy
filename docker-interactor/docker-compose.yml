@@ -15,3 +15,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # QUAN TRỌNG: Đường dẫn bên trong và bên ngoài phải giống hệt nhau (DooD)
       - /root/online-study:/root/online-study
+    networks:
+      - online-study_online-study-network
+
+networks:
+  online-study_online-study-network:
+    external: true

@@ -13,6 +13,27 @@ if (!SECRET_TOKEN) {
 const PROJECT_DIR = '/root/online-study'; // Đường dẫn phải giống hệt trên Host (Docker out of Docker)
 
 /**
+ * MODULE HEALTH MONITOR
+ */
+async function checkHealth(serviceName, url, maxRetries = 12, delayMs = 5000) {
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      console.log(`[Health Monitor] Đang ping ${serviceName} (${url}) (Lần ${i}/${maxRetries})...`);
+      const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (response.ok) {
+        console.log(`✅ ${serviceName} đã READY và LIVE! (Status: ${response.status})`);
+        return true;
+      }
+      console.warn(`⚠️ ${serviceName} chưa sẵn sàng. (Status: ${response.status})`);
+    } catch (error) {
+      console.warn(`⚠️ Đang chờ ${serviceName} khởi động... (${error.name})`);
+    }
+    await new Promise(res => setTimeout(res, delayMs));
+  }
+  throw new Error(`[Health Monitor] 🚨 Mất kết nối! ${serviceName} KHÔNG vượt qua được bài test sức khỏe sau ${maxRetries * delayMs / 1000}s`);
+}
+
+/**
  * HÀM MAIN ĐIỀU PHỐI (ORCHESTRATOR)
  */
 async function main() {
@@ -25,8 +46,12 @@ async function main() {
     console.log(`\n[2] Đang khởi động lại hệ thống (Up)...`);
     const { stdout: upOut, stderr: upErr } = await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml up -d --remove-orphans`);
     console.log(upOut || upErr);
+
+    console.log(`\n[3] Kích hoạt Health Monitor Module...`);
+    await checkHealth('Backend API', 'http://backend:8080/api/actuator/health');
+    await checkHealth('Frontend Nginx', 'http://frontend:80/');
     
-    console.log(`\n[3] Đang dọn dẹp các Image rác để giải phóng ổ cứng (Prune)...`);
+    console.log(`\n[4] Đang dọn dẹp các Image rác để giải phóng ổ cứng (Prune)...`);
     const { stdout: pruneOut, stderr: pruneErr } = await exec(`docker system prune -f`);
     console.log(pruneOut || pruneErr);
 
