@@ -37,6 +37,11 @@ services:
       - uploaded_files:/app/Files-Upload
     networks:
       - online-study-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   # 3. Service Frontend React (Using Docker Hub Image)
   frontend:
@@ -44,9 +49,15 @@ services:
     container_name: online-study-frontend
     restart: always
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - online-study-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # 4. Nginx Reverse Proxy Gateway (Open only HTTP 80 and HTTPS 443)
   nginx:
@@ -54,14 +65,40 @@ services:
     container_name: online-study-nginx
     restart: always
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - online-study-network
+
+  # 5. Hệ thống thu thập chỉ số (Prometheus)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: online-study-prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - online-study-network
+
+  # 6. Bảng điều khiển giám sát (Grafana)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: online-study-grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
     networks:
       - online-study-network
 
