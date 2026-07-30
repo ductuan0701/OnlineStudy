@@ -1,5 +1,4 @@
 services:
-  # 1. Cơ sở dữ liệu MySQL
   db:
     image: mysql:8.0
     container_name: online-study-db
@@ -17,7 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Service Backend Spring Boo
   backend:
     build:
       context: ./hoctructuyen
@@ -40,7 +38,6 @@ services:
     networks:
       - online-study-network
 
-  # 3. Service Frontend React
   frontend:
     build:
       context: ./Learning-Online
@@ -54,7 +51,6 @@ services:
     networks:
       - online-study-network
 
-  # 4. Nginx Reverse Proxy Gateway
   nginx:
     image: nginx:alpine
     container_name: online-study-nginx
