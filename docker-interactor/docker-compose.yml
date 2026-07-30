@@ -1,0 +1,13 @@
+services:
+  docker-webhook-agent:
+    build: .
+    container_name: docker-webhook-agent
+    restart: always
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - SECRET_TOKEN=my-secret
+    volumes:
+      # Mount quyền truy cập Docker Daemon từ máy host vào container
+      - /var/run/docker.sock:/var/run/docker.sock
