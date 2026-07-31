@@ -17,10 +17,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Service Backend Spring Boot (Closed port 8080 to public, using Docker Hub Image)
-  backend:
+  # 2. Service Backend Spring Boot (Blue & Green)
+  backend-blue:
     image: boychungtinh/online-study-backend:latest
-    container_name: online-study-backend
+    container_name: online-study-backend-blue
     restart: always
     depends_on:
       db:
@@ -43,14 +43,48 @@ services:
       timeout: 5s
       retries: 6
 
-  # 3. Service Frontend React (Using Docker Hub Image)
-  frontend:
-    image: boychungtinh/online-study-frontend:latest
-    container_name: online-study-frontend
+  backend-green:
+    image: boychungtinh/online-study-backend:latest
+    container_name: online-study-backend-green
     restart: always
     depends_on:
-      backend:
+      db:
         condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-onlinestudy}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-OnlineStudyRootSecret2026!}
+      MOMO_PARTNERCODE: ${MOMO_PARTNER_CODE:-MOMOLRJZ20181206}
+      MOMO_ACCESSKEY: ${MOMO_ACCESS_KEY:-mTCKt9W3eU1m39TW}
+      MOMO_SECRETKEY: ${MOMO_SECRET_KEY:-SetA5RDnLHvt51AULf51DyauxUo3kDU6}
+      SERVER_SERVLET_CONTEXT_PATH: /api
+    volumes:
+      - uploaded_files:/app/Files-Upload
+    networks:
+      - online-study-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/api/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # 3. Service Frontend React (Blue & Green)
+  frontend-blue:
+    image: boychungtinh/online-study-frontend:latest
+    container_name: online-study-frontend-blue
+    restart: always
+    networks:
+      - online-study-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend-green:
+    image: boychungtinh/online-study-frontend:latest
+    container_name: online-study-frontend-green
+    restart: always
     networks:
       - online-study-network
     healthcheck:
@@ -64,16 +98,13 @@ services:
     image: nginx:alpine
     container_name: online-study-nginx
     restart: always
-    depends_on:
-      frontend:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
+
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/upstreams.conf:/etc/nginx/conf.d/upstreams.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     networks:
       - online-study-network
