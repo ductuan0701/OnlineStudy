@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # proxy_manager.sh
 # Usage: ./proxy_manager.sh <UPSTREAM_NAME> <NEW_SERVER:PORT>

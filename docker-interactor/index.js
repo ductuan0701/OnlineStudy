@@ -57,6 +57,39 @@ async function getActiveColor(serviceName) {
 }
 
 /**
+ * CANARY ANALYSIS MODULE (SMART ROLLBACK)
+ */
+async function canaryAnalysis(durationMs = 120000, checkIntervalMs = 15000) {
+  console.log(`\n[5] BẮT ĐẦU GIAI ĐOẠN CANARY ANALYSIS (${durationMs/1000}s)`);
+  const endTime = Date.now() + durationMs;
+  
+  while (Date.now() < endTime) {
+    try {
+      // Truy vấn Prometheus: Đếm tỷ lệ lỗi 5xx trong 1 phút qua
+      const query = encodeURIComponent(`sum(rate(http_server_requests_seconds_count{status=~"5.."}[1m]))`);
+      // Địa chỉ prometheus:9090 khả dụng vì chung mạng online-study-network
+      const response = await fetch(`http://prometheus:9090/api/v1/query?query=${query}`, { signal: AbortSignal.timeout(5000) });
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data.result.length > 0) {
+        const errorRate = parseFloat(data.data.result[0].value[1]);
+        if (errorRate > 0) { // Ngưỡng: > 0 (Khắt khe: Rollback ngay khi có bất kỳ 500 nào)
+          console.error(`🚨 CANARY ALERT: Phát hiện lỗi 5xx trên Production (Error Rate: ${errorRate}). Kích hoạt Smart Rollback!`);
+          return false; // Trả về false để báo hiệu cần Rollback
+        }
+      }
+      console.log(`[Canary] Hệ thống đang ổn định... Tiếp tục theo dõi...`);
+    } catch (err) {
+      console.warn(`[Canary] Cảnh báo: Không thể kết nối Prometheus: ${err.message}`);
+    }
+    await new Promise(res => setTimeout(res, checkIntervalMs));
+  }
+  
+  console.log(`✅ CANARY PASS: Bản cập nhật vượt qua bài kiểm tra an toàn sau ${durationMs/1000}s!`);
+  return true;
+}
+
+/**
  * HÀM MAIN ĐIỀU PHỐI (ORCHESTRATOR) - ZERO DOWNTIME
  */
 async function main() {
@@ -85,7 +118,23 @@ async function main() {
     const { stdout: proxyOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service frontend-${inactiveColor}:80`);
     console.log(proxyOut2);
 
-    console.log(`\n[5] Đang dập tắt container cũ (${activeColor.toUpperCase()}) để giải phóng tài nguyên...`);
+    // Giai đoạn Canary Analysis
+    const isCanarySafe = await canaryAnalysis(120000, 15000); // Theo dõi 2 phút
+    
+    if (!isCanarySafe) {
+      console.log(`\n[ROLLBACK] Đang tiến hành khôi phục về phiên bản cũ (${activeColor.toUpperCase()})...`);
+      const { stdout: rbOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service backend-${activeColor}:8080`);
+      console.log(rbOut1);
+      const { stdout: rbOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service frontend-${activeColor}:80`);
+      console.log(rbOut2);
+      
+      console.log(`\n[ROLLBACK] Đang dập tắt container lỗi (${inactiveColor.toUpperCase()})...`);
+      await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml stop backend-${inactiveColor} frontend-${inactiveColor}`);
+      
+      throw new Error("Triển khai thất bại do không vượt qua Canary Analysis. Đã tự động Rollback thành công bảo vệ người dùng!");
+    }
+
+    console.log(`\n[6] Đang dập tắt container cũ (${activeColor.toUpperCase()}) để giải phóng tài nguyên...`);
     await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml stop backend-${activeColor} frontend-${activeColor}`);
 
     console.log(`\n[6] Đang dọn dẹp các Image rác để giải phóng ổ cứng (Prune)...`);
