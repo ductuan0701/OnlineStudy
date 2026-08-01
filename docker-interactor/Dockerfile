@@ -19,5 +19,4 @@ COPY . .
 # Expose cổng Webhook
 EXPOSE 9000
 
-# Chạy Agent
 CMD ["node", "index.js"]
