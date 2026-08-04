@@ -111,9 +111,9 @@ async function main() {
     await checkHealth(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
 
     console.log(`\n[4] Chuyển đổi luồng Nginx (Zero-Downtime Switch)...`);
-    const { stdout: proxyOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service backend-${inactiveColor}:8080`);
+    const { stdout: proxyOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service online-study-backend-${inactiveColor}:8080`);
     console.log(proxyOut1);
-    const { stdout: proxyOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service frontend-${inactiveColor}:80`);
+    const { stdout: proxyOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service online-study-frontend-${inactiveColor}:80`);
     console.log(proxyOut2);
 
     // Giai đoạn Canary Analysis
@@ -121,9 +121,9 @@ async function main() {
 
     if (!isCanarySafe) {
       console.log(`\n[ROLLBACK] Đang tiến hành khôi phục về phiên bản cũ (${activeColor.toUpperCase()})...`);
-      const { stdout: rbOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service backend-${activeColor}:8080`);
+      const { stdout: rbOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service online-study-backend-${activeColor}:8080`);
       console.log(rbOut1);
-      const { stdout: rbOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service frontend-${activeColor}:80`);
+      const { stdout: rbOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service online-study-frontend-${activeColor}:80`);
       console.log(rbOut2);
 
       console.log(`\n[ROLLBACK] Đang dập tắt container lỗi (${inactiveColor.toUpperCase()})...`);
