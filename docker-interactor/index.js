@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 9000;
 const SECRET_TOKEN = process.env.SECRET_TOKEN;
 if (!SECRET_TOKEN) {
   console.error("🚨 LỖI BẢO MẬT: Bạn chưa cấu hình biến môi trường SECRET_TOKEN trong file .env!");
-  process.exit(1); // Ép buộc tắt ứng dụng nếu không có mật khẩu
+  process.exit(1);
 }
 const PROJECT_DIR = '/root/online-study'; // Đường dẫn phải giống hệt trên Host (Docker out of Docker)
 
@@ -60,17 +60,15 @@ async function getActiveColor(serviceName) {
  * CANARY ANALYSIS MODULE (SMART ROLLBACK)
  */
 async function canaryAnalysis(durationMs = 120000, checkIntervalMs = 15000) {
-  console.log(`\n[5] BẮT ĐẦU GIAI ĐOẠN CANARY ANALYSIS (${durationMs/1000}s)`);
+  console.log(`\n[5] BẮT ĐẦU GIAI ĐOẠN CANARY ANALYSIS (${durationMs / 1000}s)`);
   const endTime = Date.now() + durationMs;
-  
+
   while (Date.now() < endTime) {
     try {
-      // Truy vấn Prometheus: Đếm tỷ lệ lỗi 5xx trong 1 phút qua
       const query = encodeURIComponent(`sum(rate(http_server_requests_seconds_count{status=~"5.."}[1m]))`);
-      // Địa chỉ prometheus:9090 khả dụng vì chung mạng online-study-network
       const response = await fetch(`http://prometheus:9090/api/v1/query?query=${query}`, { signal: AbortSignal.timeout(5000) });
       const data = await response.json();
-      
+
       if (data.status === 'success' && data.data.result.length > 0) {
         const errorRate = parseFloat(data.data.result[0].value[1]);
         if (errorRate > 0) { // Ngưỡng: > 0 (Khắt khe: Rollback ngay khi có bất kỳ 500 nào)
@@ -84,8 +82,8 @@ async function canaryAnalysis(durationMs = 120000, checkIntervalMs = 15000) {
     }
     await new Promise(res => setTimeout(res, checkIntervalMs));
   }
-  
-  console.log(`✅ CANARY PASS: Bản cập nhật vượt qua bài kiểm tra an toàn sau ${durationMs/1000}s!`);
+
+  console.log(`✅ CANARY PASS: Bản cập nhật vượt qua bài kiểm tra an toàn sau ${durationMs / 1000}s!`);
   return true;
 }
 
@@ -102,7 +100,7 @@ async function main() {
     console.log(`\n[1] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
     const { stdout: pullOut, stderr: pullErr } = await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml pull`);
     console.log(pullOut || pullErr);
-    
+
     console.log(`\n[2] Đang khởi động container mới (${inactiveColor.toUpperCase()})...`);
     // Chỉ bật đích danh container mới, không đụng chạm container cũ
     const { stdout: upOut, stderr: upErr } = await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml up -d backend-${inactiveColor} frontend-${inactiveColor}`);
@@ -111,7 +109,7 @@ async function main() {
     console.log(`\n[3] Kích hoạt Health Monitor Module...`);
     await checkHealth(`Backend API (${inactiveColor})`, `http://backend-${inactiveColor}:8080/api/actuator/health`);
     await checkHealth(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
-    
+
     console.log(`\n[4] Chuyển đổi luồng Nginx (Zero-Downtime Switch)...`);
     const { stdout: proxyOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service backend-${inactiveColor}:8080`);
     console.log(proxyOut1);
@@ -120,17 +118,17 @@ async function main() {
 
     // Giai đoạn Canary Analysis
     const isCanarySafe = await canaryAnalysis(120000, 15000); // Theo dõi 2 phút
-    
+
     if (!isCanarySafe) {
       console.log(`\n[ROLLBACK] Đang tiến hành khôi phục về phiên bản cũ (${activeColor.toUpperCase()})...`);
       const { stdout: rbOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service backend-${activeColor}:8080`);
       console.log(rbOut1);
       const { stdout: rbOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service frontend-${activeColor}:80`);
       console.log(rbOut2);
-      
+
       console.log(`\n[ROLLBACK] Đang dập tắt container lỗi (${inactiveColor.toUpperCase()})...`);
       await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml stop backend-${inactiveColor} frontend-${inactiveColor}`);
-      
+
       throw new Error("Triển khai thất bại do không vượt qua Canary Analysis. Đã tự động Rollback thành công bảo vệ người dùng!");
     }
 
