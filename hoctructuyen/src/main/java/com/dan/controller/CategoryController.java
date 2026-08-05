@@ -18,11 +18,18 @@ public class CategoryController {
     private CategoryService categoryService;
 
     @GetMapping("")
-    public ResponseEntity<Page<Category>> getAllCategories(@RequestParam(value = "keyword", defaultValue = "") String keyword,
-                                                          @RequestParam(value = "page", defaultValue = "0") int page,
-                                                          @RequestParam(value = "size", defaultValue = "10") int size,
-                                                          @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
-                                                          @RequestParam(value = "order", defaultValue = "desc") String order) {
+    public ResponseEntity<Page<Category>> getAllCategories(
+            @RequestParam(value = "keyword", defaultValue = "") String keyword,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
+            @RequestParam(value = "order", defaultValue = "desc") String order) {
+
+        // GIẢ LẬP LỖI 500 ĐỂ TEST CANARY ROLLBACK
+        if (true) {
+            throw new RuntimeException("Test lỗi Canary: Lỗi 500 Internal Server Error được tạo cố ý!");
+        }
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc(sortBy)));
         return new ResponseEntity<>(categoryService.getAllCategories(keyword, pageable), HttpStatus.OK);
     }
