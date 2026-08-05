@@ -27,7 +27,7 @@ public class CategoryController {
 
         // GIẢ LẬP LỖI 500 ĐỂ TEST CANARY ROLLBACK
         if (true) {
-            throw new RuntimeException("Test lỗi Canary: Lỗi 500 Internal Server Error được tạo cố ý!");
+            throw new RuntimeException("Test lỗi : Lỗi 500 Internal Server Error được tạo cố ý!");
         }
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc(sortBy)));
