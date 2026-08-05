@@ -116,7 +116,6 @@ async function main() {
     const { stdout: proxyOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service online-study-frontend-${inactiveColor}:80`);
     console.log(proxyOut2);
 
-    // Giai đoạn Canary Analysis
     const isCanarySafe = await canaryAnalysis(120000, 15000); // Theo dõi 2 phút
 
     if (!isCanarySafe) {
