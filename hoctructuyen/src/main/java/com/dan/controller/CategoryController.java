@@ -25,11 +25,6 @@ public class CategoryController {
             @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
             @RequestParam(value = "order", defaultValue = "desc") String order) {
 
-        // GIẢ LẬP LỖI 500 ĐỂ TEST CANARY ROLLBACK
-        if (true) {
-            throw new RuntimeException("Test lỗi : Lỗi 500 Internal Server Error được tạo cố ý!");
-        }
-
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc(sortBy)));
         return new ResponseEntity<>(categoryService.getAllCategories(keyword, pageable), HttpStatus.OK);
     }
