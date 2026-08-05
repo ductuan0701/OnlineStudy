@@ -102,7 +102,7 @@ async function main() {
     console.log(pullOut || pullErr);
 
     console.log(`\n[2] Đang khởi động container mới (${inactiveColor.toUpperCase()})...`);
-    // Chỉ bật đích danh container mới, không đụng chạm container cũ
+
     const { stdout: upOut, stderr: upErr } = await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml up -d backend-${inactiveColor} frontend-${inactiveColor}`);
     console.log(upOut || upErr);
 
