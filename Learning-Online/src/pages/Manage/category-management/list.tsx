@@ -89,7 +89,7 @@ const ListCategoryManagement = () => {
                 Number(idSelected),
                 setLoading
             ).then((res) => {
-                if (res) {
+                if (res !== undefined) {
                     onSearch().then(() => { })
                 }
             })

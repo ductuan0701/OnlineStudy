@@ -94,9 +94,9 @@ class CategoryService {
             return await RequestService
                 .delete(`${Endpoint.Category.Delete}/${id}`)
                 .then(response => {
-                    if (response) {
+                    if (response !== undefined) {
                         SuccessMessage("Xóa thành công", "")
-                        return response
+                        return true
                     }
                     setLoading(false)
                     return response;
