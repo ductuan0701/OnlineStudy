@@ -1,5 +1,4 @@
 services:
-  # 1. Cơ sở dữ liệu MySQL (Closed port 3306 to public)
   db:
     image: mysql:8.0
     container_name: online-study-db
@@ -17,9 +16,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Service Backend Spring Boot (Blue & Green)
   backend-blue:
-    image: boychungtinh/online-study-backend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:latest
     container_name: online-study-backend-blue
     restart: always
     depends_on:
@@ -44,7 +42,7 @@ services:
       retries: 6
 
   backend-green:
-    image: boychungtinh/online-study-backend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:latest
     container_name: online-study-backend-green
     restart: always
     depends_on:
@@ -68,9 +66,8 @@ services:
       timeout: 5s
       retries: 6
 
-  # 3. Service Frontend React (Blue & Green)
   frontend-blue:
-    image: boychungtinh/online-study-frontend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:latest
     container_name: online-study-frontend-blue
     restart: always
     networks:
@@ -82,7 +79,7 @@ services:
       retries: 3
 
   frontend-green:
-    image: boychungtinh/online-study-frontend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:latest
     container_name: online-study-frontend-green
     restart: always
     networks:
@@ -93,15 +90,14 @@ services:
       timeout: 5s
       retries: 3
 
-  # 4. Nginx Reverse Proxy Gateway (Open only HTTP 80 and HTTPS 443)
   nginx:
     image: nginx:alpine
     container_name: online-study-nginx
     restart: always
 
     ports:
-      - "81:80"
-      - "444:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/upstreams.conf:/etc/nginx/conf.d/upstreams.conf:ro
@@ -109,7 +105,6 @@ services:
     networks:
       - online-study-network
 
-  # 5. Hệ thống thu thập chỉ số (Prometheus)
   prometheus:
     image: prom/prometheus:latest
     container_name: online-study-prometheus
@@ -121,7 +116,6 @@ services:
     networks:
       - online-study-network
 
-  # 6. Bảng điều khiển giám sát (Grafana)
   grafana:
     image: grafana/grafana:latest
     container_name: online-study-grafana
