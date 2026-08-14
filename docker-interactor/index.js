@@ -4,10 +4,17 @@ const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 
 // Cấu hình Express Webhook
 const app = express();
-app.use(express.json()); // Hỗ trợ body JSON
+// Hỗ trợ body JSON, giới hạn 100kb và lưu lại Raw Body để tính HMAC
+app.use(express.json({
+  limit: '100kb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 const PORT = process.env.PORT || 9000;
 const SECRET_TOKEN = process.env.SECRET_TOKEN;
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
@@ -17,6 +24,17 @@ if (!SECRET_TOKEN) {
   console.error("🚨 LỖI BẢO MẬT: Bạn chưa cấu hình biến môi trường SECRET_TOKEN trong file .env!");
   process.exit(1);
 }
+
+// Chống Replay Attack: Lưu trữ các ID đã xử lý
+const processedDeliveries = new Set();
+const MAX_PROCESSED = 1000;
+
+// Giới hạn số lượng Request (Rate Limit) cho Webhook: Tối đa 15 request / 1 phút
+const webhookLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, 
+  max: 15,
+  message: "Too many webhook requests from this IP, please try again after a minute."
+});
 
 /**
  * GỬI THÔNG BÁO SLACK (ALERTING)
@@ -284,16 +302,52 @@ async function main(commitSha) {
   }
 }
 
-app.post('/webhook', async (req, res) => {
-  const token = req.query.token;
-  const commitSha = req.body?.commit_sha || req.query?.commit_sha || 'unknown_commit';
+app.post('/webhook', webhookLimiter, async (req, res) => {
+  const signature = req.headers['x-hub-signature-256'];
+  const deliveryId = req.headers['x-github-delivery'];
+  const event = req.headers['x-github-event'];
+  
+  // Trích xuất thông tin log an toàn
+  const commitSha = req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
+  const sender = req.body?.sender?.login || 'unknown_sender';
 
-  if (token !== SECRET_TOKEN) {
-    console.log(`[Webhook] ⛔ Bị từ chối truy cập do sai Token!`);
-    return res.status(401).send('Unauthorized');
+  if (!signature) {
+    console.log(`[Webhook] ⛔ Bị từ chối: Thiếu X-Hub-Signature-256 header! (Sender: ${sender})`);
+    return res.status(401).send('Unauthorized: Missing signature');
   }
 
-  console.log(`\n[Webhook] 🟢 Nhận được tín hiệu Auto-Deploy hợp lệ! (Commit: ${commitSha})`);
+  // Chống Replay Attack
+  if (deliveryId && processedDeliveries.has(deliveryId)) {
+    console.log(`[Webhook] ⛔ Bị từ chối (Replay Attack): Đã xử lý Delivery ID ${deliveryId}`);
+    return res.status(400).send('Duplicate Delivery ID');
+  }
+
+  // Xác thực HMAC-SHA256 an toàn với constant-time comparison
+  try {
+    const hmac = crypto.createHmac('sha256', SECRET_TOKEN);
+    const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+    
+    // So sánh constant-time để chống Timing Attack
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
+      console.log(`[Webhook] ⛔ Bị từ chối: Chữ ký HMAC không khớp! (Gửi từ: ${req.ip})`);
+      return res.status(401).send('Unauthorized: Invalid signature');
+    }
+  } catch (error) {
+    console.log(`[Webhook] ⛔ Lỗi khi kiểm tra chữ ký: ${error.message}`);
+    return res.status(500).send('Internal Server Error');
+  }
+
+  // Lưu Delivery ID vào danh sách đã xử lý
+  if (deliveryId) {
+    processedDeliveries.add(deliveryId);
+    if (processedDeliveries.size > MAX_PROCESSED) {
+      // Xóa phần tử cũ nhất nếu vượt quá 1000
+      const iterator = processedDeliveries.values();
+      processedDeliveries.delete(iterator.next().value);
+    }
+  }
+
+  console.log(`\n[Webhook] 🟢 Tín hiệu HỢP LỆ! (Event: ${event} | Actor: ${sender} | Commit: ${commitSha} | ID: ${deliveryId})`);
   // Trả về 202 Accepted ngay lập tức để Webhook caller không bị Timeout
   res.status(202).send('Accepted. Deploying in background...');
 
