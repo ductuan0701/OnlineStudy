@@ -83,12 +83,4 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-to-vps:
-    name: Deploy to VPS Server via Webhook
-    needs: [build-and-push-backend, build-and-push-frontend]
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Auto Deploy Webhook
-        run: |
-          curl -X POST "http://${{ secrets.VPS_HOST }}:9000/webhook?token=${{ secrets.WEBHOOK_TOKEN }}"
+
