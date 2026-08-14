@@ -3,8 +3,6 @@ services:
     build: .
     container_name: docker-webhook-agent
     restart: always
-    ports:
-      - "9000:9000"
     environment:
       - PORT=9000
       - SECRET_TOKEN=${WEBHOOK_TOKEN}
