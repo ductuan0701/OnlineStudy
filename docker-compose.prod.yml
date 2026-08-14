@@ -4,10 +4,13 @@ services:
     container_name: online-study-db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-OnlineStudyRootSecret2026!}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinestudy}
+      MYSQL_USER: ${MYSQL_APP_USER:-onlinestudy_user}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
     networks:
       - online-study-network
     healthcheck:
@@ -25,11 +28,11 @@ services:
         condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-onlinestudy}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-root}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-OnlineStudyRootSecret2026!}
-      MOMO_PARTNERCODE: ${MOMO_PARTNER_CODE:-MOMOLRJZ20181206}
-      MOMO_ACCESSKEY: ${MOMO_ACCESS_KEY:-mTCKt9W3eU1m39TW}
-      MOMO_SECRETKEY: ${MOMO_SECRET_KEY:-SetA5RDnLHvt51AULf51DyauxUo3kDU6}
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_APP_USER:-onlinestudy_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_APP_PASSWORD}
+      MOMO_PARTNERCODE: ${MOMO_PARTNER_CODE}
+      MOMO_ACCESSKEY: ${MOMO_ACCESS_KEY}
+      MOMO_SECRETKEY: ${MOMO_SECRET_KEY}
       SERVER_SERVLET_CONTEXT_PATH: /api
     volumes:
       - uploaded_files:/app/Files-Upload
@@ -50,11 +53,11 @@ services:
         condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-onlinestudy}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-root}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-OnlineStudyRootSecret2026!}
-      MOMO_PARTNERCODE: ${MOMO_PARTNER_CODE:-MOMOLRJZ20181206}
-      MOMO_ACCESSKEY: ${MOMO_ACCESS_KEY:-mTCKt9W3eU1m39TW}
-      MOMO_SECRETKEY: ${MOMO_SECRET_KEY:-SetA5RDnLHvt51AULf51DyauxUo3kDU6}
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_APP_USER:-onlinestudy_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_APP_PASSWORD}
+      MOMO_PARTNERCODE: ${MOMO_PARTNER_CODE}
+      MOMO_ACCESSKEY: ${MOMO_ACCESS_KEY}
+      MOMO_SECRETKEY: ${MOMO_SECRET_KEY}
       SERVER_SERVLET_CONTEXT_PATH: /api
     volumes:
       - uploaded_files:/app/Files-Upload
@@ -121,7 +124,7 @@ services:
     container_name: online-study-grafana
     restart: always
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
     depends_on:
       - prometheus
     networks:
