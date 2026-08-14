@@ -316,16 +316,20 @@ app.get('/history', (req, res) => {
 
   let rowsHtml = logs.map(log => `
     <tr>
-      <td class="text-center text-muted">${new Date(log.start_time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
-      <td class="text-center"><code><i class="fa-solid fa-code-commit"></i> ${log.commit_sha}</code></td>
-      <td class="text-center"><span class="flow-badge">${log.old_version.toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${log.new_version.toUpperCase()}</span></td>
-      <td class="text-center font-weight-bold">${log.duration_seconds}s</td>
+      <td class="text-center text-muted nowrap">${new Date(log.start_time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
       <td class="text-center">
+        <a href="https://github.com/ductuan0701/OnlineStudy/commit/${log.commit_sha}" target="_blank" class="commit-link">
+          <i class="fa-brands fa-github"></i> ${log.commit_sha.length > 10 ? log.commit_sha.substring(0, 7) : log.commit_sha}
+        </a>
+      </td>
+      <td class="text-center nowrap"><span class="flow-badge">${log.old_version.toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${log.new_version.toUpperCase()}</span></td>
+      <td class="text-center font-weight-bold nowrap">${log.duration_seconds}s</td>
+      <td class="text-center nowrap">
         <span class="badge ${log.status === 'SUCCESS' ? 'badge-success' : 'badge-danger'}">
           <i class="fa-solid ${log.status === 'SUCCESS' ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${log.status}
         </span>
       </td>
-      <td class="text-center text-danger font-italic"><small>${log.rollback_reason || '-'}</small></td>
+      <td class="text-danger font-italic ${log.rollback_reason ? 'rollback-cell' : 'text-center'}"><small>${log.rollback_reason || '-'}</small></td>
     </tr>
   `).join('');
 
@@ -376,7 +380,7 @@ app.get('/history', (req, res) => {
         
         .table-responsive { padding: 0; overflow-x: auto; }
         table { width: 100%; border-collapse: separate; border-spacing: 0; }
-        th, td { padding: 18px 15px; border-bottom: 1px solid var(--border); }
+        th, td { padding: 18px 15px; border-bottom: 1px solid var(--border); vertical-align: middle; }
         th { 
           background-color: #f8fafc; 
           font-weight: 600; 
@@ -384,6 +388,7 @@ app.get('/history', (req, res) => {
           font-size: 13px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
+          white-space: nowrap;
         }
         tr:last-child td { border-bottom: none; }
         tr:hover td { background-color: #f8fafc; transition: all 0.2s ease; }
@@ -393,6 +398,8 @@ app.get('/history', (req, res) => {
         .text-danger { color: #ef4444; }
         .font-weight-bold { font-weight: 600; }
         .font-italic { font-style: italic; }
+        .nowrap { white-space: nowrap; }
+        .rollback-cell { text-align: left; max-width: 300px; line-height: 1.5; }
         .py-5 { padding-top: 3rem; padding-bottom: 3rem; }
         
         .badge { 
@@ -404,19 +411,28 @@ app.get('/history', (req, res) => {
           align-items: center;
           gap: 6px;
           letter-spacing: 0.3px;
+          white-space: nowrap;
         }
         .badge-success { background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
         .badge-danger { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
         
-        code { 
+        .commit-link { 
           background: #f1f5f9; 
-          padding: 5px 10px; 
+          padding: 6px 10px; 
           border-radius: 6px; 
           font-size: 13px;
           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
           color: #3b82f6;
           border: 1px solid #e2e8f0;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          transition: all 0.2s;
         }
+        .commit-link:hover { background: #e2e8f0; color: #2563eb; }
+        
         .flow-badge {
           font-size: 12px;
           font-weight: 700;
@@ -424,6 +440,7 @@ app.get('/history', (req, res) => {
           background: #f1f5f9;
           padding: 4px 10px;
           border-radius: 6px;
+          white-space: nowrap;
         }
         .flow-badge i { margin: 0 4px; color: #94a3b8; font-size: 10px; }
       </style>
