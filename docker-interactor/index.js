@@ -307,8 +307,16 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   const deliveryId = req.headers['x-github-delivery'];
   const event = req.headers['x-github-event'];
   
+  // Xử lý chống trôi lệnh (Race Condition): Chỉ kích hoạt khi Github Actions đã chạy xong và thành công
+  if (event === 'workflow_run') {
+    if (req.body.action !== 'completed' || req.body.workflow_run?.conclusion !== 'success') {
+      console.log(`[Webhook] 🟡 Bỏ qua sự kiện ${event} vì trạng thái là: ${req.body.action} / ${req.body.workflow_run?.conclusion}`);
+      return res.status(200).send('Ignored: Workflow not completed or not successful');
+    }
+  }
+  
   // Trích xuất thông tin log an toàn
-  const commitSha = req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
+  const commitSha = req.body?.workflow_run?.head_commit?.id || req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
   const sender = req.body?.sender?.login || 'unknown_sender';
 
   if (!signature) {

@@ -13,3 +13,7 @@ nginx/ssl/*.crt
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Dynamic state files modified by CI/CD
+nginx/upstreams.conf
+docker-interactor/deployments.json
