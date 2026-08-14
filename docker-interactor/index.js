@@ -31,13 +31,13 @@ const MAX_PROCESSED = 1000;
 
 // Giới hạn số lượng Request (Rate Limit) cho Webhook: Tối đa 15 request / 1 phút
 const webhookLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, 
+  windowMs: 1 * 60 * 1000,
   max: 15,
   message: "Too many webhook requests from this IP, please try again after a minute."
 });
 
 /**
- * GỬI THÔNG BÁO SLACK (ALERTING)
+ * GỬI THÔNG BÁO SLACK 
  */
 async function sendSlackAlert(logData) {
   if (!SLACK_WEBHOOK_URL) return;
@@ -306,7 +306,7 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   const signature = req.headers['x-hub-signature-256'];
   const deliveryId = req.headers['x-github-delivery'];
   const event = req.headers['x-github-event'];
-  
+
   // Xử lý chống trôi lệnh (Race Condition): Chỉ kích hoạt khi Github Actions đã chạy xong và thành công
   if (event === 'workflow_run') {
     if (req.body.action !== 'completed' || req.body.workflow_run?.conclusion !== 'success') {
@@ -314,7 +314,7 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
       return res.status(200).send('Ignored: Workflow not completed or not successful');
     }
   }
-  
+
   // Trích xuất thông tin log an toàn
   const commitSha = req.body?.workflow_run?.head_commit?.id || req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
   const sender = req.body?.sender?.login || 'unknown_sender';
@@ -334,7 +334,7 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   try {
     const hmac = crypto.createHmac('sha256', SECRET_TOKEN);
     const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
-    
+
     // So sánh constant-time để chống Timing Attack
     if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
       console.log(`[Webhook] ⛔ Bị từ chối: Chữ ký HMAC không khớp! (Gửi từ: ${req.ip})`);
