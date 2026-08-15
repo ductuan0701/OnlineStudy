@@ -415,7 +415,7 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   // Trả về 202 Accepted lập tức để Webhook caller không Timeout
   res.status(202).send('Accepted. Deploying in background...');
 
-  // Kích hoạt tiến cập nhật 
+  // Kích hoạt tiến cập nhật
   await main(commitSha);
 });
 
