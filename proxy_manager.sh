@@ -27,7 +27,7 @@ fi
 cp "$UPSTREAMS_FILE" "${UPSTREAMS_FILE}.bak"
 echo "- Đã backup cấu hình hiện tại ra ${UPSTREAMS_FILE}.bak"
 
-# 3. Thay đổi thông tin server bằng awk
+# 3. Thay đổi thông tin server bằng 
 awk -v upstream="$UPSTREAM_NAME" -v new_server="$NEW_SERVER" '
 $1 == "upstream" && $2 == upstream "{" { in_block=1; print; next }
 $1 == "upstream" && $2 == upstream { in_block=1; print; next }
