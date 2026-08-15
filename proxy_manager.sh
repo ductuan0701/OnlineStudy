@@ -38,14 +38,18 @@ in_block && $1 == "server" { print "    server " new_server ";"; in_block=0; nex
 echo "- Đã cập nhật file upstreams.conf:"
 grep -A 2 "upstream $UPSTREAM_NAME" "$UPSTREAMS_FILE"
 
-# 4. Kiểm tra cấu hình Nginx (Nginx Test)
+# 4. Kiểm tra cấu hình Nginx (Nginx Test) bằng ephemeral container để tránh dùng EXEC
 echo "- Đang kiểm tra cấu hình mới..."
-TEST_RESULT=$(docker exec "$CONTAINER_NAME" nginx -t 2>&1)
+TEST_RESULT=$(docker run --rm \
+    -v /root/online-study/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+    -v /root/online-study/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro \
+    -v /root/online-study/nginx/upstreams.conf:/etc/nginx/upstreams.conf:ro \
+    nginx:alpine nginx -t 2>&1)
 
 if echo "$TEST_RESULT" | grep -q "syntax is ok"; then
     echo "- Cấu hình hợp lệ. Đang tiến hành reload Nginx (Graceful Reload)..."
-    # 5. Thực hiện Graceful Reload
-    docker exec "$CONTAINER_NAME" nginx -s reload
+    # 5. Thực hiện Graceful Reload bằng tín hiệu SIGHUP (Không cần EXEC)
+    docker kill --signal=HUP "$CONTAINER_NAME"
     echo "=> HOÀN TẤT! Đã chuyển traffic sang $NEW_SERVER mà không bị gián đoạn (Zero-Downtime)."
 else
     echo "LỖI: Cấu hình không hợp lệ!"
@@ -55,3 +59,4 @@ else
     echo "=> Đã khôi phục an toàn. Quá trình deploy thất bại, hệ thống vẫn giữ nguyên phiên bản cũ."
     exit 1
 fi
+
