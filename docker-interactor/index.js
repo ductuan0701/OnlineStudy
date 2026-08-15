@@ -1,6 +1,7 @@
 const express = require('express');
 const util = require('util');
-const exec = util.promisify(require('child_process').exec);
+const { execFile } = require('child_process');
+const runCmd = util.promisify(execFile);
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -234,15 +235,20 @@ async function main(commitSha) {
   try {
     activeColor = await getActiveColor('backend');
     inactiveColor = activeColor === 'blue' ? 'green' : 'blue';
+
+    const ALLOWED_COLORS = ['blue', 'green'];
+    if (!ALLOWED_COLORS.includes(activeColor) || !ALLOWED_COLORS.includes(inactiveColor)) {
+      throw new Error('Security Violation: Invalid Color!');
+    }
     console.log(`\n[0] Nhận diện luồng hiện tại: ${activeColor.toUpperCase()}. Sẽ deploy vào luồng mới: ${inactiveColor.toUpperCase()}`);
 
     console.log(`\n[1] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
-    const { stdout: pullOut, stderr: pullErr } = await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml pull`);
+    const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'pull'], { cwd: PROJECT_DIR });
     console.log(pullOut || pullErr);
 
     console.log(`\n[2] Đang khởi động container mới (${inactiveColor.toUpperCase()})...`);
 
-    const { stdout: upOut, stderr: upErr } = await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml up -d backend-${inactiveColor} frontend-${inactiveColor}`);
+    const { stdout: upOut, stderr: upErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'up', '-d', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR });
     console.log(upOut || upErr);
 
     console.log(`\n[3] Kích hoạt Health Monitor Module...`);
@@ -250,9 +256,9 @@ async function main(commitSha) {
     await checkHealth(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
 
     console.log(`\n[4] Chuyển đổi luồng Nginx (Zero-Downtime Switch)...`);
-    const { stdout: proxyOut1 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service online-study-backend-${inactiveColor}:8080`);
+    const { stdout: proxyOut1 } = await runCmd('./proxy_manager.sh', ['backend_service', `online-study-backend-${inactiveColor}:8080`], { cwd: PROJECT_DIR });
     console.log(proxyOut1);
-    const { stdout: proxyOut2 } = await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service online-study-frontend-${inactiveColor}:80`);
+    const { stdout: proxyOut2 } = await runCmd('./proxy_manager.sh', ['frontend_service', `online-study-frontend-${inactiveColor}:80`], { cwd: PROJECT_DIR });
     console.log(proxyOut2);
 
     const canaryResult = await canaryAnalysis(120000, 15000); // Theo dõi 2 phút
@@ -261,21 +267,21 @@ async function main(commitSha) {
       rollbackReason = canaryResult.reason;
       deploymentStatus = 'ROLLED_BACK';
       console.log(`\n[ROLLBACK] Đang tiến hành khôi phục về phiên bản cũ (${activeColor.toUpperCase()})...`);
-      await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh backend_service online-study-backend-${activeColor}:8080`);
-      await exec(`cd ${PROJECT_DIR} && ./proxy_manager.sh frontend_service online-study-frontend-${activeColor}:80`);
+      await runCmd('./proxy_manager.sh', ['backend_service', `online-study-backend-${activeColor}:8080`], { cwd: PROJECT_DIR });
+      await runCmd('./proxy_manager.sh', ['frontend_service', `online-study-frontend-${activeColor}:80`], { cwd: PROJECT_DIR });
 
       console.log(`\n[ROLLBACK] Đang dập tắt container lỗi (${inactiveColor.toUpperCase()})...`);
-      await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml stop backend-${inactiveColor} frontend-${inactiveColor}`);
+      await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'stop', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR });
 
       throw new Error(`Triển khai thất bại. Lý do: ${rollbackReason}`);
     }
 
     deploymentStatus = 'SUCCESS';
     console.log(`\n[6] Đang dập tắt container cũ (${activeColor.toUpperCase()}) để giải phóng tài nguyên...`);
-    await exec(`cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml stop backend-${activeColor} frontend-${activeColor}`);
+    await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'stop', `backend-${activeColor}`, `frontend-${activeColor}`], { cwd: PROJECT_DIR });
 
     console.log(`\n[6] Đang dọn dẹp các Image rác để giải phóng ổ cứng (Prune)...`);
-    const { stdout: pruneOut, stderr: pruneErr } = await exec(`docker system prune -f`);
+    const { stdout: pruneOut, stderr: pruneErr } = await runCmd('docker', ['system', 'prune', '-f']);
     console.log(pruneOut || pruneErr);
 
     console.log("\n=== HOÀN TẤT TRIỂN KHAI ZERO-DOWNTIME THÀNH CÔNG! ===");

@@ -1,4 +1,17 @@
 services:
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - NETWORKS=1
+      - VOLUMES=1
+      - POST=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - online-study_online-study-network
+
   docker-webhook-agent:
     build: .
     container_name: docker-webhook-agent
@@ -6,13 +19,22 @@ services:
     environment:
       - PORT=9000
       - SECRET_TOKEN=${WEBHOOK_TOKEN}
+      - DOCKER_HOST=tcp://docker-proxy:2375
     env_file:
       - .env
     volumes:
-      # Mount quyền truy cập Docker Daemon từ máy host vào container
-      - /var/run/docker.sock:/var/run/docker.sock
-      # QUAN TRỌNG: Đường dẫn bên trong và bên ngoài phải giống hệt nhau (DooD)
       - /root/online-study:/root/online-study
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    depends_on:
+      - docker-proxy
     networks:
       - online-study_online-study-network
 
