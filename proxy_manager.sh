@@ -40,7 +40,7 @@ grep -A 2 "upstream $UPSTREAM_NAME" "$UPSTREAMS_FILE"
 
 # 4. Kiểm tra cấu hình Nginx (Nginx Test) bằng ephemeral container để tránh dùng EXEC
 echo "- Đang kiểm tra cấu hình mới..."
-TEST_RESULT=$(docker run --rm \
+TEST_RESULT=$(docker run --rm --network online-study_online-study-network \
     -v /root/online-study/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro \
     -v /root/online-study/nginx/upstreams.conf:/etc/nginx/conf.d/upstreams.conf:ro \
     -v /root/online-study/nginx/ssl:/etc/nginx/ssl:ro \
