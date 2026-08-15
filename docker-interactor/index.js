@@ -8,9 +8,11 @@ const rateLimit = require('express-rate-limit');
 
 // Cấu hình Express Webhook
 const app = express();
+app.set('trust proxy', 1); // Cần thiết khi chạy sau Nginx/Cloudflare để Rate Limit lấy đúng IP
+
 // Hỗ trợ body JSON, giới hạn 100kb và lưu lại Raw Body để tính HMAC
 app.use(express.json({
-  limit: '100kb',
+  limit: '5mb',
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
@@ -303,7 +305,7 @@ async function main(commitSha) {
 
     // Mở khoá hệ thống
     isDeploying = false;
-    
+
     // Gửi cảnh báo qua Slack
     await sendSlackAlert(logData);
   }

@@ -5,8 +5,21 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
+  security-scan:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks-action
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-and-push-backend:
     name: Build and Push Backend Image
+    needs: [security-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,6 +58,7 @@ jobs:
 
   build-and-push-frontend:
     name: Build and Push Frontend Image
+    needs: [security-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
