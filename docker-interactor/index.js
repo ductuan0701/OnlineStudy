@@ -401,7 +401,7 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
     return res.status(500).send('Internal Server Error');
   }
 
-  // Lưu Delivery ID vào danh sách đã xử lý
+  // Lưu Delivery ID vào danh sách xử lý
   if (deliveryId) {
     processedDeliveries.add(deliveryId);
     if (processedDeliveries.size > MAX_PROCESSED) {
