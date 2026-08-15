@@ -29,6 +29,9 @@ if (!SECRET_TOKEN) {
 const processedDeliveries = new Set();
 const MAX_PROCESSED = 1000;
 
+// Khoá tiến trình (Mutex Lock) để chống chạy đè nhiều bản Deploy cùng lúc
+let isDeploying = false;
+
 // Giới hạn số lượng Request (Rate Limit) cho Webhook: Tối đa 15 request / 1 phút
 const webhookLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
@@ -218,6 +221,7 @@ async function canaryAnalysis(durationMs = 120000, checkIntervalMs = 15000) {
  * HÀM MAIN ĐIỀU PHỐI (ORCHESTRATOR) - ZERO DOWNTIME
  */
 async function main(commitSha) {
+  isDeploying = true;
   console.log(`=== BẮT ĐẦU TIẾN TRÌNH ZERO-DOWNTIME DEPLOY (Commit: ${commitSha}) ===`);
   const startTime = Date.now();
   let deploymentStatus = 'FAILED';
@@ -297,6 +301,9 @@ async function main(commitSha) {
     // Lưu lịch sử vào DB
     saveDeploymentLog(logData);
 
+    // Mở khoá hệ thống
+    isDeploying = false;
+    
     // Gửi cảnh báo qua Slack
     await sendSlackAlert(logData);
   }
@@ -313,6 +320,12 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
       console.log(`[Webhook] 🟡 Bỏ qua sự kiện ${event} vì trạng thái là: ${req.body.action} / ${req.body.workflow_run?.conclusion}`);
       return res.status(200).send('Ignored: Workflow not completed or not successful');
     }
+  }
+
+  // Kiểm tra Mutex Lock: Tránh chạy đè 2 bản Deploy cùng lúc
+  if (isDeploying) {
+    console.log(`[Webhook] 🟡 Bị từ chối: Đang có một tiến trình Deploy khác đang chạy!`);
+    return res.status(429).send('Too Many Requests: Another deployment is in progress');
   }
 
   // Trích xuất thông tin log an toàn
