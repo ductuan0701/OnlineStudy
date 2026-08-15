@@ -42,16 +42,16 @@ function updateDeploymentState(commitSha, state, extra = {}) {
   try {
     let deployments = [];
     if (fs.existsSync(DB_FILE)) deployments = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-    
+
     let target = deployments.find(d => d.commit_sha === commitSha && !['SUCCESS', 'FAILED', 'ROLLED_BACK'].includes(d.status));
     if (!target) {
-      target = { 
-        deployment_id: 'dep_' + Date.now(), 
-        commit_sha: commitSha, 
-        status: state, 
+      target = {
+        deployment_id: 'dep_' + Date.now(),
+        commit_sha: commitSha,
+        status: state,
         start_time: new Date().toISOString(),
         application: 'online-study',
-        ...extra 
+        ...extra
       };
       deployments.unshift(target);
     } else {
@@ -59,8 +59,8 @@ function updateDeploymentState(commitSha, state, extra = {}) {
       Object.assign(target, extra);
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(deployments, null, 2));
-    console.log(`[State Machine] ${commitSha.substring(0,7)} -> ${state}`);
-  } catch(e) {}
+    console.log(`[State Machine] ${commitSha.substring(0, 7)} -> ${state}`);
+  } catch (e) { }
 }
 
 function processQueue() {
@@ -203,18 +203,18 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
       // 1. Phân tích Error Rate (5xx) gắn nhãn color
       const error5xxRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{status=~"5..", instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
       const totalRequestRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
-      
+
       // Xử lý INCONCLUSIVE: Không có data hoặc Zero Traffic
       if (totalRequestRate === null) {
-         console.warn(`⚠️ INCONCLUSIVE: Không có dữ liệu metric cho ${candidateColor}!`);
-         return { passed: false, reason: 'INCONCLUSIVE: No metric data' };
+        console.warn(`⚠️ INCONCLUSIVE: Không có dữ liệu metric cho ${candidateColor}!`);
+        return { passed: false, reason: 'INCONCLUSIVE: No metric data' };
       }
       // Quy đổi sang request / phút
       const requestsPerMin = totalRequestRate * 60;
       if (requestsPerMin < MIN_REQUESTS_THRESHOLD) {
-         console.warn(`⚠️ INCONCLUSIVE: Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Yêu cầu tối thiểu ${MIN_REQUESTS_THRESHOLD} req/m để đánh giá chính xác.`);
-         // Fail-closed hoặc tiếp tục chờ? Đề tài yêu cầu fail-closed (Rollback) hoặc để vận hành. Ở đây chọn Fail-Closed.
-         return { passed: false, reason: 'INCONCLUSIVE: Zero or low traffic' };
+        console.warn(`⚠️ INCONCLUSIVE: Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Yêu cầu tối thiểu ${MIN_REQUESTS_THRESHOLD} req/m để đánh giá chính xác.`);
+        // Fail-closed hoặc tiếp tục chờ? Đề tài yêu cầu fail-closed (Rollback) hoặc để vận hành. Ở đây chọn Fail-Closed.
+        return { passed: false, reason: 'INCONCLUSIVE: Zero or low traffic' };
       }
 
       let errorPercentage = (error5xxRate || 0) / totalRequestRate * 100;
@@ -412,7 +412,7 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   }
 
   console.log(`\n[Webhook] 🟢 Tín hiệu HỢP LỆ! (Event: ${event} | Actor: ${sender} | Commit: ${commitSha} | ID: ${deliveryId})`);
-  // Trả về 202 Accepted ngay lập tức để Webhook caller không bị Timeout
+  // Trả về 202 Accepted lập tức để Webhook caller không bị Timeout
   res.status(202).send('Accepted. Deploying in background...');
 
   // Kích hoạt tiến trình cập nhật ngầm
@@ -443,16 +443,14 @@ app.get('/history', (req, res) => {
       <td class="text-center nowrap"><span class="flow-badge">${(log.old_version || '?').toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${(log.new_version || '?').toUpperCase()}</span></td>
       <td class="text-center font-weight-bold nowrap">${log.duration_seconds !== undefined ? log.duration_seconds + 's' : '<i class="fa-solid fa-spinner fa-spin text-muted"></i>'}</td>
       <td class="text-center nowrap">
-        <span class="badge ${
-          log.status === 'SUCCESS' ? 'badge-success' : 
-          (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'badge-danger' : 
-          log.status === 'QUEUED' ? 'badge-warning' : 'badge-info'
-        }">
-          <i class="fa-solid ${
-            log.status === 'SUCCESS' ? 'fa-circle-check' : 
-            (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'fa-circle-xmark' : 
-            'fa-circle-notch fa-spin'
-          }"></i> ${log.status}
+        <span class="badge ${log.status === 'SUCCESS' ? 'badge-success' :
+      (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'badge-danger' :
+        log.status === 'QUEUED' ? 'badge-warning' : 'badge-info'
+    }">
+          <i class="fa-solid ${log.status === 'SUCCESS' ? 'fa-circle-check' :
+      (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'fa-circle-xmark' :
+        'fa-circle-notch fa-spin'
+    }"></i> ${log.status}
         </span>
       </td>
       <td class="text-danger font-italic ${log.rollback_reason ? 'rollback-cell' : 'text-center'}"><small>${log.rollback_reason || '-'}</small></td>
