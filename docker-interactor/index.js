@@ -205,16 +205,18 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
       const totalRequestRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
 
       // Xử lý INCONCLUSIVE: Không có data hoặc Zero Traffic
-      if (totalRequestRate === null) {
-        console.warn(`⚠️ INCONCLUSIVE: Không có dữ liệu metric cho ${candidateColor}!`);
-        return { passed: false, reason: 'INCONCLUSIVE: No metric data' };
+      if (totalRequestRate === null || totalRequestRate === 0) {
+        console.warn(`⚠️ Đang chờ dữ liệu metric từ Prometheus cho ${candidateColor}...`);
+        await new Promise(r => setTimeout(r, checkIntervalMs));
+        continue;
       }
+
       // Quy đổi sang request / phút
       const requestsPerMin = totalRequestRate * 60;
       if (requestsPerMin < MIN_REQUESTS_THRESHOLD) {
-        console.warn(`⚠️ INCONCLUSIVE: Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Yêu cầu tối thiểu ${MIN_REQUESTS_THRESHOLD} req/m để đánh giá chính xác.`);
-        // Fail-closed hoặc tiếp tục chờ? Đề tài yêu cầu fail-closed (Rollback) hoặc để vận hành. Ở đây chọn Fail-Closed.
-        return { passed: false, reason: 'INCONCLUSIVE: Zero or low traffic' };
+        console.warn(`⚠️ Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Đang chờ thêm traffic...`);
+        await new Promise(r => setTimeout(r, checkIntervalMs));
+        continue;
       }
 
       let errorPercentage = (error5xxRate || 0) / totalRequestRate * 100;
