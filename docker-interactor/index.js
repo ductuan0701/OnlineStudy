@@ -211,7 +211,7 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
         continue;
       }
 
-      // Quy đổi sang request / phút
+      // Quy đổi sang request/phút
       const requestsPerMin = totalRequestRate * 60;
       if (requestsPerMin < MIN_REQUESTS_THRESHOLD) {
         console.warn(`⚠️ Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Đang chờ thêm traffic...`);
