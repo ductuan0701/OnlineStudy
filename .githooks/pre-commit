@@ -1,0 +1,30 @@
+#!/bin/bash
+# Pre-commit hook: Tự động chạy Gitleaks để quét bảo mật trước khi commit
+
+echo "=========================================================="
+echo "🔍 [Pre-Commit] Bắt đầu quét bảo mật (Secret Scan)..."
+
+# Kiểm tra xem Docker có đang chạy không
+if ! docker info > /dev/null 2>&1; then
+  echo "⚠️ Docker chưa được bật trên máy tính. Bỏ qua bước quét bảo mật."
+  exit 0
+fi
+
+# Chạy Gitleaks thông qua Docker (Không cần cài đặt trên máy Mac)
+docker run --rm -v "$(pwd):/path" zricethezav/gitleaks:latest detect --source="/path" --redact -v
+
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo ""
+  echo "🚨 PHÁT HIỆN LỘ LỌT BẢO MẬT (Mật khẩu, Token, API Key...)!"
+  echo "❌ Lệnh Commit đã bị HỦY để bảo vệ dự án."
+  echo "👉 Gợi ý: Hãy xoá thông tin nhạy cảm ở các file báo đỏ bên trên."
+  echo "👉 Nếu đó chỉ là mã giả (fake), hãy thêm bình luận '# gitleaks:allow' vào cuối dòng code đó."
+  echo "=========================================================="
+  exit 1
+fi
+
+echo "✅ Mã nguồn an toàn. Cho phép Commit!"
+echo "=========================================================="
+exit 0
