@@ -11,7 +11,7 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # Chạy Gitleaks thông qua Docker (Không cần cài đặt trên máy Mac)
-docker run --rm -v "$(pwd):/path" zricethezav/gitleaks:latest detect --source="/path" --redact -v
+docker run --rm -v "$(pwd):/path" zricethezav/gitleaks:latest protect --source="/path" --staged --redact -v
 
 EXIT_CODE=$?
 

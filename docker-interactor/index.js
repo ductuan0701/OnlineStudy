@@ -33,7 +33,41 @@ const processedDeliveries = new Set();
 const MAX_PROCESSED = 1000;
 
 // Khoá tiến trình (Mutex Lock) để chống chạy đè nhiều bản Deploy cùng lúc
+// Khoá tiến trình và Hàng đợi (Queue)
 let isDeploying = false;
+const deploymentQueue = []; // Mục 34: Dùng Queue
+
+// Mục 36: Lưu State Machine bền vững
+function updateDeploymentState(commitSha, state, extra = {}) {
+  try {
+    let deployments = [];
+    if (fs.existsSync(DB_FILE)) deployments = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+    
+    let target = deployments.find(d => d.commit_sha === commitSha && !['SUCCESS', 'FAILED', 'ROLLED_BACK'].includes(d.status));
+    if (!target) {
+      target = { 
+        deployment_id: 'dep_' + Date.now(), 
+        commit_sha: commitSha, 
+        status: state, 
+        start_time: new Date().toISOString(),
+        application: 'online-study',
+        ...extra 
+      };
+      deployments.unshift(target);
+    } else {
+      target.status = state;
+      Object.assign(target, extra);
+    }
+    fs.writeFileSync(DB_FILE, JSON.stringify(deployments, null, 2));
+    console.log(`[State Machine] ${commitSha.substring(0,7)} -> ${state}`);
+  } catch(e) {}
+}
+
+function processQueue() {
+  if (isDeploying || deploymentQueue.length === 0) return;
+  const nextCommit = deploymentQueue.shift();
+  main(nextCommit);
+}
 
 // Giới hạn số lượng Request (Rate Limit) cho Webhook: Tối đa 15 request / 1 phút
 const webhookLimiter = rateLimit({
@@ -144,80 +178,74 @@ async function fetchPrometheusMetric(query) {
   try {
     const encodedQuery = encodeURIComponent(query);
     const response = await fetch(`http://prometheus:9090/api/v1/query?query=${encodedQuery}`, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error(`Prometheus HTTP ${response.status}`);
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
-      return Number.isNaN(val) ? 0 : val;
+      return Number.isNaN(val) ? null : val;
     }
-    return 0;
+    return null; // No data
   } catch (e) {
-    return 0;
+    throw new Error(`Prometheus Unavailable: ${e.message}`);
   }
 }
 
 /**
  * CANARY ANALYSIS MODULE (MULTI-DIMENSIONAL SMART ROLLBACK)
  */
-async function canaryAnalysis(durationMs = 120000, checkIntervalMs = 15000) {
-  console.log(`\n[5] BẮT ĐẦU GIAI ĐOẠN CANARY ANALYSIS (Multi-dimensional) - ${durationMs / 1000}s`);
+async function canaryAnalysis(candidateColor, durationMs = 120000, checkIntervalMs = 15000) {
+  console.log(`\n[5] BẮT ĐẦU POST-DEPLOYMENT VERIFICATION (${candidateColor.toUpperCase()}) - ${durationMs / 1000}s`);
   const endTime = Date.now() + durationMs;
+  const MIN_REQUESTS_THRESHOLD = 5; // Yêu cầu tối thiểu 5 request/phút để đánh giá
 
   while (Date.now() < endTime) {
-    // 1. Phân tích Error Rate (5xx)
-    const error5xxRate = await fetchPrometheusMetric('sum(rate(http_server_requests_seconds_count{status=~"5.."}[1m]))');
-    const totalRequestRate = await fetchPrometheusMetric('sum(rate(http_server_requests_seconds_count[1m]))');
-    let errorPercentage = 0;
-    if (totalRequestRate > 0) {
-      errorPercentage = (error5xxRate / totalRequestRate) * 100;
-    } else if (error5xxRate > 0) {
-      errorPercentage = 100;
-    }
+    try {
+      // 1. Phân tích Error Rate (5xx) gắn nhãn color
+      const error5xxRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{status=~"5..", instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
+      const totalRequestRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
+      
+      // Xử lý INCONCLUSIVE: Không có data hoặc Zero Traffic
+      if (totalRequestRate === null) {
+         console.warn(`⚠️ INCONCLUSIVE: Không có dữ liệu metric cho ${candidateColor}!`);
+         return { passed: false, reason: 'INCONCLUSIVE: No metric data' };
+      }
+      // Quy đổi sang request / phút
+      const requestsPerMin = totalRequestRate * 60;
+      if (requestsPerMin < MIN_REQUESTS_THRESHOLD) {
+         console.warn(`⚠️ INCONCLUSIVE: Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Yêu cầu tối thiểu ${MIN_REQUESTS_THRESHOLD} req/m để đánh giá chính xác.`);
+         // Fail-closed hoặc tiếp tục chờ? Đề tài yêu cầu fail-closed (Rollback) hoặc để vận hành. Ở đây chọn Fail-Closed.
+         return { passed: false, reason: 'INCONCLUSIVE: Zero or low traffic' };
+      }
 
-    // 2. Phân tích Độ trễ (Latency P95 & P99)
-    const p95Latency = await fetchPrometheusMetric('histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le))');
-    const p99Latency = await fetchPrometheusMetric('histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket[1m])) by (le))');
+      let errorPercentage = (error5xxRate || 0) / totalRequestRate * 100;
 
-    // 3. Phân tích Tài nguyên Máy chủ (CPU & Memory)
-    const cpuUsage = await fetchPrometheusMetric('process_cpu_usage') * 100;
-    const heapUsed = await fetchPrometheusMetric('sum(jvm_memory_used_bytes{area="heap"})');
-    const heapMax = await fetchPrometheusMetric('sum(jvm_memory_max_bytes{area="heap"})');
-    const memoryUsage = heapMax > 0 ? (heapUsed / heapMax) * 100 : 0;
+      // 2. Phân tích Độ trễ (Latency P95 & P99)
+      const p95Latency = await fetchPrometheusMetric(`histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{instance="online-study-backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
+      const p99Latency = await fetchPrometheusMetric(`histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{instance="online-study-backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
 
-    // In điểm số Canary Score hiện tại
-    console.log(`[Canary Score] Err: ${errorPercentage.toFixed(2)}% | P95: ${(p95Latency * 1000).toFixed(0)}ms | P99: ${(p99Latency * 1000).toFixed(0)}ms | CPU: ${cpuUsage.toFixed(1)}% | Mem: ${memoryUsage.toFixed(1)}%`);
+      // 3. Phân tích Saturation (Tài nguyên Máy chủ)
+      const cpuUsage = (await fetchPrometheusMetric(`process_cpu_usage{instance="online-study-backend-${candidateColor}:8080"}`) || 0) * 100;
+      const heapUsed = await fetchPrometheusMetric(`sum(jvm_memory_used_bytes{area="heap", instance="online-study-backend-${candidateColor}:8080"})`);
+      const heapMax = await fetchPrometheusMetric(`sum(jvm_memory_max_bytes{area="heap", instance="online-study-backend-${candidateColor}:8080"})`);
+      const memoryUsage = heapMax > 0 ? ((heapUsed || 0) / heapMax) * 100 : 0;
 
-    // Kiểm tra các ngưỡng giới hạn (Thresholds)
-    if (errorPercentage > 1.0) {
-      const msg = `🚨 Lỗi 5xx vượt ngưỡng 1% (${errorPercentage.toFixed(2)}%)!`;
-      console.error(`CANARY ALERT: ${msg}`);
-      return { passed: false, reason: msg };
-    }
-    if (p95Latency > 0.500) {
-      const msg = `🚨 P95 Latency vượt ngưỡng 500ms (${(p95Latency * 1000).toFixed(0)}ms)!`;
-      console.error(`CANARY ALERT: ${msg}`);
-      return { passed: false, reason: msg };
-    }
-    if (p99Latency > 1.000) {
-      const msg = `🚨 P99 Latency vượt ngưỡng 1s (${(p99Latency * 1000).toFixed(0)}ms)!`;
-      console.error(`CANARY ALERT: ${msg}`);
-      return { passed: false, reason: msg };
-    }
-    if (cpuUsage > 80.0) {
-      const msg = `🚨 CPU Usage vượt ngưỡng 80% (${cpuUsage.toFixed(1)}%)!`;
-      console.error(`CANARY ALERT: ${msg}`);
-      return { passed: false, reason: msg };
-    }
-    if (memoryUsage > 85.0) {
-      const msg = `🚨 Memory Usage vượt ngưỡng 85% (${memoryUsage.toFixed(1)}%)!`;
-      console.error(`CANARY ALERT: ${msg}`);
-      return { passed: false, reason: msg };
-    }
+      console.log(`[Score] Traffic: ${requestsPerMin.toFixed(1)} req/m | Err: ${errorPercentage.toFixed(2)}% | P95: ${(p95Latency * 1000).toFixed(0)}ms | CPU: ${cpuUsage.toFixed(1)}% | Mem: ${memoryUsage.toFixed(1)}%`);
 
-    await new Promise(res => setTimeout(res, checkIntervalMs));
+      // Tiêu chí FAIL (Khôi phục)
+      if (errorPercentage > 1.0) return { passed: false, reason: `FAIL: Lỗi 5xx vượt ngưỡng (${errorPercentage.toFixed(2)}%)` };
+      if (p95Latency > 0.500) return { passed: false, reason: `FAIL: P95 Latency vượt ngưỡng 500ms (${(p95Latency * 1000).toFixed(0)}ms)` };
+      if (cpuUsage > 80.0) return { passed: false, reason: `FAIL: CPU Usage bão hòa (${cpuUsage.toFixed(1)}%)` };
+
+      await new Promise(res => setTimeout(res, checkIntervalMs));
+    } catch (e) {
+      // INCONCLUSIVE: Prometheus sập hoặc Parse Error -> Fail Closed
+      console.error(`🚨 INCONCLUSIVE ERROR: ${e.message}`);
+      return { passed: false, reason: `INCONCLUSIVE: ${e.message}` };
+    }
   }
 
-  console.log(`✅ CANARY PASS: Bản cập nhật đạt điểm An Toàn (Safe Score) trên mọi chỉ số!`);
-  return { passed: true, reason: 'Mọi chỉ số an toàn' };
+  console.log(`✅ PASS: Xác minh Post-Deployment thành công!`);
+  return { passed: true, reason: 'PASS' };
 }
 
 /**
@@ -225,6 +253,7 @@ async function canaryAnalysis(durationMs = 120000, checkIntervalMs = 15000) {
  */
 async function main(commitSha) {
   isDeploying = true;
+  updateDeploymentState(commitSha, 'PREPARING');
   console.log(`=== BẮT ĐẦU TIẾN TRÌNH ZERO-DOWNTIME DEPLOY (Commit: ${commitSha}) ===`);
   const startTime = Date.now();
   let deploymentStatus = 'FAILED';
@@ -252,16 +281,19 @@ async function main(commitSha) {
     console.log(upOut || upErr);
 
     console.log(`\n[3] Kích hoạt Health Monitor Module...`);
+    updateDeploymentState(commitSha, 'HEALTH_CHECK');
     await checkHealth(`Backend API (${inactiveColor})`, `http://backend-${inactiveColor}:8080/api/actuator/health`);
     await checkHealth(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
 
     console.log(`\n[4] Chuyển đổi luồng Nginx (Zero-Downtime Switch)...`);
+    updateDeploymentState(commitSha, 'SWITCHED');
     const { stdout: proxyOut1 } = await runCmd('./proxy_manager.sh', ['backend_service', `online-study-backend-${inactiveColor}:8080`], { cwd: PROJECT_DIR });
     console.log(proxyOut1);
     const { stdout: proxyOut2 } = await runCmd('./proxy_manager.sh', ['frontend_service', `online-study-frontend-${inactiveColor}:80`], { cwd: PROJECT_DIR });
     console.log(proxyOut2);
 
-    const canaryResult = await canaryAnalysis(120000, 15000); // Theo dõi 2 phút
+    updateDeploymentState(commitSha, 'VERIFYING');
+    const canaryResult = await canaryAnalysis(inactiveColor, 120000, 15000); // Truyền candidateColor
 
     if (!canaryResult.passed) {
       rollbackReason = canaryResult.reason;
@@ -306,11 +338,12 @@ async function main(commitSha) {
       rollback_reason: rollbackReason
     };
 
-    // Lưu lịch sử vào DB
-    saveDeploymentLog(logData);
+    // Lưu trạng thái cuối
+    updateDeploymentState(commitSha, deploymentStatus, logData);
 
-    // Mở khoá hệ thống
+    // Mở khoá và chạy Job tiếp theo
     isDeploying = false;
+    processQueue();
 
     // Gửi cảnh báo qua Slack
     await sendSlackAlert(logData);
@@ -330,10 +363,12 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
     }
   }
 
-  // Kiểm tra Mutex Lock: Tránh chạy đè 2 bản Deploy cùng lúc
+  // Mục 34 & 37: Hàng đợi (Queue) - Tuần tự hóa các Webhook đến cùng lúc
   if (isDeploying) {
-    console.log(`[Webhook] 🟡 Bị từ chối: Đang có một tiến trình Deploy khác đang chạy!`);
-    return res.status(429).send('Too Many Requests: Another deployment is in progress');
+    console.log(`[Webhook] 🟡 Đưa vào hàng đợi (QUEUED): Tiến trình khác đang chạy!`);
+    deploymentQueue.push(commitSha);
+    updateDeploymentState(commitSha, 'QUEUED');
+    return res.status(202).send('Queued');
   }
 
   // Trích xuất thông tin log an toàn
