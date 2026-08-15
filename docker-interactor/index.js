@@ -440,11 +440,19 @@ app.get('/history', (req, res) => {
           <i class="fa-brands fa-github"></i> ${log.commit_sha.length > 10 ? log.commit_sha.substring(0, 7) : log.commit_sha}
         </a>
       </td>
-      <td class="text-center nowrap"><span class="flow-badge">${log.old_version.toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${log.new_version.toUpperCase()}</span></td>
-      <td class="text-center font-weight-bold nowrap">${log.duration_seconds}s</td>
+      <td class="text-center nowrap"><span class="flow-badge">${(log.old_version || '?').toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${(log.new_version || '?').toUpperCase()}</span></td>
+      <td class="text-center font-weight-bold nowrap">${log.duration_seconds !== undefined ? log.duration_seconds + 's' : '<i class="fa-solid fa-spinner fa-spin text-muted"></i>'}</td>
       <td class="text-center nowrap">
-        <span class="badge ${log.status === 'SUCCESS' ? 'badge-success' : 'badge-danger'}">
-          <i class="fa-solid ${log.status === 'SUCCESS' ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${log.status}
+        <span class="badge ${
+          log.status === 'SUCCESS' ? 'badge-success' : 
+          (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'badge-danger' : 
+          log.status === 'QUEUED' ? 'badge-warning' : 'badge-info'
+        }">
+          <i class="fa-solid ${
+            log.status === 'SUCCESS' ? 'fa-circle-check' : 
+            (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'fa-circle-xmark' : 
+            'fa-circle-notch fa-spin'
+          }"></i> ${log.status}
         </span>
       </td>
       <td class="text-danger font-italic ${log.rollback_reason ? 'rollback-cell' : 'text-center'}"><small>${log.rollback_reason || '-'}</small></td>
@@ -533,6 +541,8 @@ app.get('/history', (req, res) => {
         }
         .badge-success { background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
         .badge-danger { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .badge-warning { background-color: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+        .badge-info { background-color: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
         
         .commit-link { 
           background: #f1f5f9; 
