@@ -273,13 +273,18 @@ async function main(commitSha) {
     }
     console.log(`\n[0] Nhận diện luồng hiện tại: ${activeColor.toUpperCase()}. Sẽ deploy vào luồng mới: ${inactiveColor.toUpperCase()}`);
 
-    console.log(`\n[1] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
-    const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'pull'], { cwd: PROJECT_DIR });
+    console.log(`\n[1] Chuẩn bị triển khai bằng Immutable Tag: sha-${commitSha.substring(0, 7)}`);
+    const imageTag = `sha-${commitSha.substring(0, 7)}`;
+    const envContent = `IMAGE_TAG=${imageTag}\n`;
+    fs.writeFileSync(path.join(PROJECT_DIR, '.env.deploy'), envContent);
+
+    console.log(`\n[2] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
+    const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', '--env-file', '.env.deploy', 'pull'], { cwd: PROJECT_DIR });
     console.log(pullOut || pullErr);
 
-    console.log(`\n[2] Đang khởi động container mới (${inactiveColor.toUpperCase()})...`);
+    console.log(`\n[3] Đang khởi động container mới (${inactiveColor.toUpperCase()})...`);
 
-    const { stdout: upOut, stderr: upErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'up', '-d', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR });
+    const { stdout: upOut, stderr: upErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', '--env-file', '.env.deploy', 'up', '-d', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR });
     console.log(upOut || upErr);
 
     console.log(`\n[3] Kích hoạt Health Monitor Module...`);
@@ -326,6 +331,7 @@ async function main(commitSha) {
       deployment_id: crypto.randomUUID(),
       application: 'Online Study Backend',
       commit_sha: commitSha,
+      image_tag: `sha-${commitSha.substring(0, 7)}`,
       old_version: activeColor,
       new_version: inactiveColor,
       strategy: 'Blue-Green / Canary',
@@ -432,11 +438,12 @@ app.get('/history', (req, res) => {
 
   let rowsHtml = logs.map(log => `
     <tr>
-      <td class="text-center text-muted nowrap">${new Date(log.start_time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
+      <td class="nowrap text-muted"><i class="fa-regular fa-clock"></i> ${new Date(log.start_time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
       <td class="text-center">
         <a href="https://github.com/ductuan0701/OnlineStudy/commit/${log.commit_sha}" target="_blank" class="commit-link">
-          <i class="fa-brands fa-github"></i> ${log.commit_sha.length > 10 ? log.commit_sha.substring(0, 7) : log.commit_sha}
+          <i class="fa-brands fa-github"></i> ${log.commit_sha.substring(0, 7)}
         </a>
+        <br/><small class="text-muted">${log.image_tag || 'latest'}</small>
       </td>
       <td class="text-center nowrap"><span class="flow-badge">${(log.old_version || '?').toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${(log.new_version || '?').toUpperCase()}</span></td>
       <td class="text-center font-weight-bold nowrap">${log.duration_seconds !== undefined ? log.duration_seconds + 's' : '<i class="fa-solid fa-spinner fa-spin text-muted"></i>'}</td>
@@ -580,7 +587,7 @@ app.get('/history', (req, res) => {
             <thead>
               <tr>
                 <th class="text-center">Thời gian</th>
-                <th class="text-center">Commit</th>
+                <th class="text-center">Commit & Tag</th>
                 <th class="text-center">Luồng</th>
                 <th class="text-center">Thời lượng</th>
                 <th class="text-center">Trạng thái</th>

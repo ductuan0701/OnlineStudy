@@ -20,7 +20,7 @@ services:
       retries: 5
 
   backend-blue:
-    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:${IMAGE_TAG:-latest}
     container_name: online-study-backend-blue
     restart: always
     labels:
@@ -47,7 +47,7 @@ services:
       retries: 6
 
   backend-green:
-    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:${IMAGE_TAG:-latest}
     container_name: online-study-backend-green
     restart: always
     labels:
@@ -74,7 +74,7 @@ services:
       retries: 6
 
   frontend-blue:
-    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:${IMAGE_TAG:-latest}
     container_name: online-study-frontend-blue
     restart: always
     labels:
@@ -88,7 +88,7 @@ services:
       retries: 3
 
   frontend-green:
-    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:latest
+    image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:${IMAGE_TAG:-latest}
     container_name: online-study-frontend-green
     restart: always
     labels:
