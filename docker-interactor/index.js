@@ -273,18 +273,16 @@ async function main(commitSha) {
     }
     console.log(`\n[0] Nhận diện luồng hiện tại: ${activeColor.toUpperCase()}. Sẽ deploy vào luồng mới: ${inactiveColor.toUpperCase()}`);
 
-    console.log(`\n[1] Chuẩn bị triển khai bằng Immutable Tag: sha-${commitSha.substring(0, 7)}`);
     const imageTag = `sha-${commitSha.substring(0, 7)}`;
-    const envContent = `IMAGE_TAG=${imageTag}\n`;
-    fs.writeFileSync(path.join(PROJECT_DIR, '.env.deploy'), envContent);
+    console.log(`\n[1] Chuẩn bị triển khai bằng Immutable Tag: ${imageTag}`);
 
     console.log(`\n[2] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
-    const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', '--env-file', '.env.deploy', 'pull'], { cwd: PROJECT_DIR });
+    const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'pull'], { cwd: PROJECT_DIR, env: { ...process.env, IMAGE_TAG: imageTag } });
     console.log(pullOut || pullErr);
 
     console.log(`\n[3] Đang khởi động container mới (${inactiveColor.toUpperCase()})...`);
 
-    const { stdout: upOut, stderr: upErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', '--env-file', '.env.deploy', 'up', '-d', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR });
+    const { stdout: upOut, stderr: upErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'up', '-d', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR, env: { ...process.env, IMAGE_TAG: imageTag } });
     console.log(upOut || upErr);
 
     console.log(`\n[3] Kích hoạt Health Monitor Module...`);
