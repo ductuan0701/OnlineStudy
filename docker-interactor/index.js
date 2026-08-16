@@ -276,6 +276,40 @@ async function main(commitSha) {
     const imageTag = `sha-${commitSha.substring(0, 7)}`;
     console.log(`\n[1] Chuẩn bị triển khai bằng Immutable Tag: ${imageTag}`);
 
+    // YÊU CẦU 2: Tạo Release Manifest & Đọc Schema Version Động (Chuẩn bị cho Rollback DB)
+    let schemaVersion = "v1.0";
+    let configVersion = "v1.0";
+    try {
+      console.log(`\n[+] Đang truy xuất cấu hình Version từ Github (Commit: ${commitSha})...`);
+      const versionUrl = `https://raw.githubusercontent.com/ductuan0701/OnlineStudy/${commitSha}/version.json`;
+      const response = await fetch(versionUrl);
+      if (response.ok) {
+        const versionData = await response.json();
+        schemaVersion = versionData.schema_version || "v1.0";
+        configVersion = versionData.config_version || "v1.0";
+        console.log(`[+] Đã tìm thấy cấu hình: Schema=${schemaVersion}, Config=${configVersion}`);
+      } else {
+        console.log(`[+] Không tìm thấy file version.json. Dùng mặc định (v1.0).`);
+      }
+    } catch (e) {
+      console.log(`[+] Lỗi đọc version.json: ${e.message}. Dùng mặc định (v1.0).`);
+    }
+
+    const manifestDir = path.join(PROJECT_DIR, 'manifests');
+    if (!fs.existsSync(manifestDir)) fs.mkdirSync(manifestDir);
+    const manifestPath = path.join(manifestDir, `release-${imageTag}.json`);
+    const releaseManifest = {
+      version: imageTag,
+      backend_digest: `boychungtinh/online-study-backend:${imageTag}`,
+      frontend_digest: `boychungtinh/online-study-frontend:${imageTag}`,
+      schema_version: schemaVersion,
+      config_version: configVersion,
+      deployed_at: new Date().toISOString(),
+      triggered_by_commit: commitSha
+    };
+    fs.writeFileSync(manifestPath, JSON.stringify(releaseManifest, null, 2));
+    console.log(`[Manifest] Đã lưu Release Manifest tại: manifests/release-${imageTag}.json`);
+
     console.log(`\n[2] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
     const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'pull'], { cwd: PROJECT_DIR, env: { ...process.env, IMAGE_TAG: imageTag } });
     console.log(pullOut || pullErr);
