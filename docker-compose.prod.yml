@@ -23,6 +23,8 @@ services:
     image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:latest
     container_name: online-study-backend-blue
     restart: always
+    labels:
+      - "project=online-study"
     depends_on:
       db:
         condition: service_healthy
@@ -48,6 +50,8 @@ services:
     image: ${DOCKER_USERNAME:-boychungtinh}/online-study-backend:latest
     container_name: online-study-backend-green
     restart: always
+    labels:
+      - "project=online-study"
     depends_on:
       db:
         condition: service_healthy
@@ -73,6 +77,8 @@ services:
     image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:latest
     container_name: online-study-frontend-blue
     restart: always
+    labels:
+      - "project=online-study"
     networks:
       - online-study-network
     healthcheck:
@@ -85,6 +91,8 @@ services:
     image: ${DOCKER_USERNAME:-boychungtinh}/online-study-frontend:latest
     container_name: online-study-frontend-green
     restart: always
+    labels:
+      - "project=online-study"
     networks:
       - online-study-network
     healthcheck:

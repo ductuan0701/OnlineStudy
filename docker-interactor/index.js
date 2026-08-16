@@ -314,10 +314,6 @@ async function main(commitSha) {
     console.log(`\n[6] Đang dập tắt container cũ (${activeColor.toUpperCase()}) để giải phóng tài nguyên...`);
     await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'stop', `backend-${activeColor}`, `frontend-${activeColor}`], { cwd: PROJECT_DIR });
 
-    console.log(`\n[6] Đang dọn dẹp các Image rác để giải phóng ổ cứng (Prune)...`);
-    const { stdout: pruneOut, stderr: pruneErr } = await runCmd('docker', ['system', 'prune', '-f']);
-    console.log(pruneOut || pruneErr);
-
     console.log("\n=== HOÀN TẤT TRIỂN KHAI ZERO-DOWNTIME THÀNH CÔNG! ===");
   } catch (error) {
     if (deploymentStatus !== 'ROLLED_BACK') {
