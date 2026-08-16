@@ -65,8 +65,8 @@ function updateDeploymentState(commitSha, state, extra = {}) {
 
 function processQueue() {
   if (isDeploying || deploymentQueue.length === 0) return;
-  const nextCommit = deploymentQueue.shift();
-  main(nextCommit);
+  const nextJob = deploymentQueue.shift();
+  main(nextJob.commitSha, nextJob.sender);
 }
 
 // Giới hạn số lượng Request (Rate Limit) cho Webhook: Tối đa 15 request / 1 phút
@@ -253,7 +253,7 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
 /**
  * HÀM MAIN ĐIỀU PHỐI (ORCHESTRATOR) - ZERO DOWNTIME
  */
-async function main(commitSha) {
+async function main(commitSha, sender = 'unknown_sender') {
   isDeploying = true;
   updateDeploymentState(commitSha, 'PREPARING');
   console.log(`=== BẮT ĐẦU TIẾN TRÌNH ZERO-DOWNTIME DEPLOY (Commit: ${commitSha}) ===`);
@@ -305,7 +305,8 @@ async function main(commitSha) {
       schema_version: schemaVersion,
       config_version: configVersion,
       deployed_at: new Date().toISOString(),
-      triggered_by_commit: commitSha
+      triggered_by_commit: commitSha,
+      triggered_by_user: sender
     };
     fs.writeFileSync(manifestPath, JSON.stringify(releaseManifest, null, 2));
     console.log(`[Manifest] Đã lưu Release Manifest tại: manifests/release-${imageTag}.json`);
@@ -391,6 +392,10 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   const deliveryId = req.headers['x-github-delivery'];
   const event = req.headers['x-github-event'];
 
+  // Trích xuất thông tin log an toàn
+  const commitSha = req.body?.workflow_run?.head_commit?.id || req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
+  const sender = req.body?.sender?.login || 'unknown_sender';
+
   // Xử lý chống trôi lệnh (Race Condition): Chỉ kích hoạt khi Github Actions đã chạy xong và thành công
   if (event === 'workflow_run') {
     if (req.body.action !== 'completed' || req.body.workflow_run?.conclusion !== 'success') {
@@ -402,14 +407,10 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
   // Mục 34 & 37: Hàng đợi (Queue) - Tuần tự hóa các Webhook đến cùng lúc
   if (isDeploying) {
     console.log(`[Webhook] 🟡 Đưa vào hàng đợi (QUEUED): Tiến trình khác đang chạy!`);
-    deploymentQueue.push(commitSha);
+    deploymentQueue.push({ commitSha, sender });
     updateDeploymentState(commitSha, 'QUEUED');
     return res.status(202).send('Queued');
   }
-
-  // Trích xuất thông tin log an toàn
-  const commitSha = req.body?.workflow_run?.head_commit?.id || req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
-  const sender = req.body?.sender?.login || 'unknown_sender';
 
   if (!signature) {
     console.log(`[Webhook] ⛔ Bị từ chối: Thiếu X-Hub-Signature-256 header! (Sender: ${sender})`);
@@ -449,10 +450,10 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
 
   console.log(`\n[Webhook] 🟢 Tín hiệu HỢP LỆ! (Event: ${event} | Actor: ${sender} | Commit: ${commitSha} | ID: ${deliveryId})`);
   // Trả về 202 Accepted lập tức để Webhook caller không Timeout
-  res.status(202).send('Accepted. Deploying in background...');
+  res.status(200).send('Webhook received! Starting SmartDeploy pipeline...');
 
-  // Kích hoạt tiến cập nhật
-  await main(commitSha);
+  // Kích hoạt luồng chính với thông tin người gửi
+  main(commitSha, sender);
 });
 
 // ==========================================
