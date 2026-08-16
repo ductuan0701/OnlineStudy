@@ -201,8 +201,8 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
   while (Date.now() < endTime) {
     try {
       // 1. Phân tích Error Rate (5xx) gắn nhãn color
-      const error5xxRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{status=~"5..", instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
-      const totalRequestRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{instance="online-study-backend-${candidateColor}:8080"}[1m]))`);
+      const error5xxRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{status=~"5..", instance="backend-${candidateColor}:8080"}[1m]))`);
+      const totalRequestRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{instance="backend-${candidateColor}:8080"}[1m]))`);
 
       // Xử lý INCONCLUSIVE: Không có data hoặc Zero Traffic
       if (totalRequestRate === null || totalRequestRate === 0) {
@@ -222,13 +222,13 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
       let errorPercentage = (error5xxRate || 0) / totalRequestRate * 100;
 
       // 2. Phân tích Độ trễ (Latency P95 & P99)
-      const p95Latency = await fetchPrometheusMetric(`histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{instance="online-study-backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
-      const p99Latency = await fetchPrometheusMetric(`histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{instance="online-study-backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
+      const p95Latency = await fetchPrometheusMetric(`histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{instance="backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
+      const p99Latency = await fetchPrometheusMetric(`histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{instance="backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
 
       // 3. Phân tích Saturation (Tài nguyên Máy chủ)
-      const cpuUsage = (await fetchPrometheusMetric(`process_cpu_usage{instance="online-study-backend-${candidateColor}:8080"}`) || 0) * 100;
-      const heapUsed = await fetchPrometheusMetric(`sum(jvm_memory_used_bytes{area="heap", instance="online-study-backend-${candidateColor}:8080"})`);
-      const heapMax = await fetchPrometheusMetric(`sum(jvm_memory_max_bytes{area="heap", instance="online-study-backend-${candidateColor}:8080"})`);
+      const cpuUsage = (await fetchPrometheusMetric(`process_cpu_usage{instance="backend-${candidateColor}:8080"}`) || 0) * 100;
+      const heapUsed = await fetchPrometheusMetric(`sum(jvm_memory_used_bytes{area="heap", instance="backend-${candidateColor}:8080"})`);
+      const heapMax = await fetchPrometheusMetric(`sum(jvm_memory_max_bytes{area="heap", instance="backend-${candidateColor}:8080"})`);
       const memoryUsage = heapMax > 0 ? ((heapUsed || 0) / heapMax) * 100 : 0;
 
       console.log(`[Score] Traffic: ${requestsPerMin.toFixed(1)} req/m | Err: ${errorPercentage.toFixed(2)}% | P95: ${(p95Latency * 1000).toFixed(0)}ms | CPU: ${cpuUsage.toFixed(1)}% | Mem: ${memoryUsage.toFixed(1)}%`);
