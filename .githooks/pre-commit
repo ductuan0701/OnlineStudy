@@ -4,7 +4,7 @@
 echo "=========================================================="
 echo "🔍 [Pre-Commit] Bắt đầu quét bảo mật (Secret Scan)..."
 
-# Kiểm tra xem Docker có đang chạy ko
+# Kiểm tra xem Docker có đang chạy k
 if ! docker info > /dev/null 2>&1; then
   echo "⚠️ Docker chưa được bật trên máy tính. Bỏ qua bước quét bảo mật."
   exit 0
