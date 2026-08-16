@@ -36,7 +36,7 @@ if [ "$CURRENT_USAGE" -ge "$DISK_THRESHOLD" ]; then
     echo ">> Dọn dẹp các Image không còn sử dụng (Dangling/Unused) cũ hơn ${RETENTION_HOURS} giờ..."
     docker image prune -a -f --filter "label=${PROJECT_LABEL}" --filter "until=${RETENTION_HOURS}h"
     
-    # Tính toán lại dung lượng
+    # Tính lại dung lượng
     NEW_USAGE=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
     echo "✅ Đã dọn dẹp xong! Dung lượng hiện tại: ${NEW_USAGE}%"
 else
