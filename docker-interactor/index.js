@@ -311,6 +311,21 @@ async function main(commitSha, sender = 'unknown_sender') {
     fs.writeFileSync(manifestPath, JSON.stringify(releaseManifest, null, 2));
     console.log(`[Manifest] Đã lưu Release Manifest tại: manifests/release-${imageTag}.json`);
 
+    // YÊU CẦU 3: Kích hoạt sao lưu DB nếu phát hiện có thay đổi Migration (Forward-only)
+    try {
+      const prevManifests = fs.readdirSync(manifestDir).filter(f => f.startsWith('release-')).sort().reverse();
+      if (prevManifests.length > 1) {
+        const lastManifest = JSON.parse(fs.readFileSync(path.join(manifestDir, prevManifests[1])));
+        if (lastManifest.schema_version !== schemaVersion) {
+          console.log(`\n[!] Phát hiện thay đổi Schema (${lastManifest.schema_version} -> ${schemaVersion}). Đang kích hoạt Runbook sao lưu DB...`);
+          await runCmd('sh', ['backup_db.sh'], { cwd: PROJECT_DIR });
+          console.log(`[!] Sao lưu DB thành công.`);
+        }
+      }
+    } catch (e) {
+      console.log(`[!] Lỗi kiểm tra/sao lưu DB: ${e.message}`);
+    }
+
     console.log(`\n[2] Đang kéo (Pull) phiên bản Image mới nhất từ Docker Hub...`);
     const { stdout: pullOut, stderr: pullErr } = await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'pull'], { cwd: PROJECT_DIR, env: { ...process.env, IMAGE_TAG: imageTag } });
     console.log(pullOut || pullErr);
