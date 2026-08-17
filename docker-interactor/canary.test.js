@@ -1,7 +1,7 @@
 const assert = require('assert');
 
 /**
- * GIẢ LẬP UNIT TEST CHO HÀM CANARY ANALYSIS
+ * GIẢ LẬP UNIT TEST CHO HÀM CANARY ANALYSI
  * Yêu cầu 32: Báo cáo minh chứng kiểm thử các kịch bản: 
  * Result rỗng, NaN, HTTP 500, Timeout, Zero Traffic, và Vượt ngưỡng.
  */
@@ -9,11 +9,11 @@ const assert = require('assert');
 // Mock hàm fetchPrometheusMetric để tiêm dữ liệu giả (Dependency Injection)
 async function mockCanaryAnalysis(scenarioConfig) {
   let { totalReq, err5xx, p95, cpu, isTimeout, isHttp500 } = scenarioConfig;
-  
+
   if (isTimeout || isHttp500) {
     return { passed: false, reason: 'INCONCLUSIVE: Prometheus Unavailable' };
   }
-  
+
   if (totalReq === null || isNaN(totalReq)) {
     return { passed: false, reason: 'INCONCLUSIVE: No metric data' };
   }
