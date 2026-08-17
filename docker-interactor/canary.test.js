@@ -3,7 +3,7 @@ const assert = require('assert');
 /**
  * GIẢ LẬP UNIT TEST CHO HÀM CANARY ANALYSI
  * Yêu cầu 32: Báo cáo minh chứng kiểm thử các kịch bản: 
- * Result rỗng, NaN, HTTP 500, Timeout, Zero Traffic, và Vượt ngưỡng.
+ * Result rỗngg, NaN, HTTP 500, Timeout, Zero Traffic, và Vượt ngưỡng.
  */
 
 // Mock hàm fetchPrometheusMetric để tiêm dữ liệu giả (Dependency Injection)
