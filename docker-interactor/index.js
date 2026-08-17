@@ -236,6 +236,7 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
       // Tiêu chí FAIL (Khôi phục)
       if (errorPercentage > 1.0) return { passed: false, reason: `FAIL: Lỗi 5xx vượt ngưỡng (${errorPercentage.toFixed(2)}%)` };
       if (p95Latency > 0.500) return { passed: false, reason: `FAIL: P95 Latency vượt ngưỡng 500ms (${(p95Latency * 1000).toFixed(0)}ms)` };
+      if (p99Latency > 0.800) return { passed: false, reason: `FAIL: P99 Latency vượt ngưỡng 800ms (${(p99Latency * 1000).toFixed(0)}ms)` };
       if (cpuUsage > 80.0) return { passed: false, reason: `FAIL: CPU Usage bão hòa (${cpuUsage.toFixed(1)}%)` };
 
       await new Promise(res => setTimeout(res, checkIntervalMs));
@@ -318,7 +319,7 @@ async function main(commitSha, sender = 'unknown_sender') {
         const lastManifest = JSON.parse(fs.readFileSync(path.join(manifestDir, prevManifests[1])));
         if (lastManifest.schema_version !== schemaVersion) {
           console.log(`\n[!] Phát hiện thay đổi Schema (${lastManifest.schema_version} -> ${schemaVersion}). Đang kích hoạt Runbook sao lưu DB...`);
-          await runCmd('sh', ['backup_db.sh'], { cwd: PROJECT_DIR });
+          await runCmd('sh', ['./scripts/backup_db.sh'], { cwd: PROJECT_DIR });
           console.log(`[!] Sao lưu DB thành công.`);
         }
       }
@@ -341,21 +342,25 @@ async function main(commitSha, sender = 'unknown_sender') {
     await checkHealth(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
 
     console.log(`\n[4] Chuyển đổi luồng Nginx (Zero-Downtime Switch)...`);
-    updateDeploymentState(commitSha, 'SWITCHED');
-    const { stdout: proxyOut1 } = await runCmd('./proxy_manager.sh', ['backend_service', `online-study-backend-${inactiveColor}:8080`], { cwd: PROJECT_DIR });
+    console.log(`\n[6] Kích hoạt Nginx Zero-Downtime Switch (Atomic Reload)...`);
+    const { stdout: proxyOut1 } = await runCmd('./scripts/proxy_manager.sh', ['backend_service', `online-study-backend-${inactiveColor}:8080`], { cwd: PROJECT_DIR });
     console.log(proxyOut1);
-    const { stdout: proxyOut2 } = await runCmd('./proxy_manager.sh', ['frontend_service', `online-study-frontend-${inactiveColor}:80`], { cwd: PROJECT_DIR });
+    const { stdout: proxyOut2 } = await runCmd('./scripts/proxy_manager.sh', ['frontend_service', `online-study-frontend-${inactiveColor}:80`], { cwd: PROJECT_DIR });
     console.log(proxyOut2);
 
     updateDeploymentState(commitSha, 'VERIFYING');
     const canaryResult = await canaryAnalysis(inactiveColor, 120000, 15000); // Truyền candidateColor
 
-    if (!canaryResult.passed) {
+    if (canaryResult.passed) {
+      console.log(`[+] Mọi thông số ổn định. Bắt đầu vô hiệu hóa luồng cũ (${activeColor.toUpperCase()})...`);
+    } else {
       rollbackReason = canaryResult.reason;
       deploymentStatus = 'ROLLED_BACK';
-      console.log(`\n[ROLLBACK] Đang tiến hành khôi phục về phiên bản cũ (${activeColor.toUpperCase()})...`);
-      await runCmd('./proxy_manager.sh', ['backend_service', `online-study-backend-${activeColor}:8080`], { cwd: PROJECT_DIR });
-      await runCmd('./proxy_manager.sh', ['frontend_service', `online-study-frontend-${activeColor}:80`], { cwd: PROJECT_DIR });
+      console.log(`\n[!] CẢNH BÁO: HỆ THỐNG GẶP LỖI (${canaryResult.reason})`);
+      console.log(`[!] TIẾN HÀNH ROLLBACK (Khôi phục Nginx về ${activeColor.toUpperCase()})...`);
+      
+      await runCmd('./scripts/proxy_manager.sh', ['backend_service', `online-study-backend-${activeColor}:8080`], { cwd: PROJECT_DIR });
+      await runCmd('./scripts/proxy_manager.sh', ['frontend_service', `online-study-frontend-${activeColor}:80`], { cwd: PROJECT_DIR });
 
       console.log(`\n[ROLLBACK] Đang dập tắt container lỗi (${inactiveColor.toUpperCase()})...`);
       await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'stop', `backend-${inactiveColor}`, `frontend-${inactiveColor}`], { cwd: PROJECT_DIR });
