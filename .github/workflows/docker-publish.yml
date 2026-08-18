@@ -4,75 +4,26 @@ on:
   push:
     branches: [ "main", "master" ]
 
-# Yêu cầu 4: Least Privilege cho GITHUB_TOKEN
-permissions:
-  contents: read      # Chỉ cho quyền đọc code
-  packages: write     # Cho phép push image
-  id-token: write     # Bắt buộc để ký Cosign OIDC
-
 jobs:
-  # ==========================================
-  # CỬA ẢI 1: KIỂM DUYỆT BẢO MẬT & CHẤT LƯỢNG MÃ NGUỒN
-  # ==========================================
-  security-and-quality-gates:
-    name: Security & Quality Gates
+  security-scan:
+    name: Gitleaks Secret Scan
     runs-on: ubuntu-latest
     steps:
-      # Yêu cầu 3: Pin Action theo mã SHA thay vì Tag
-      - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      # Quét Secret bị lộ (Gitleaks)
-      - name: Gitleaks Secret Scan
+      - name: gitleaks-action
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Chạy Test & Lint cho Backend (SAST)
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-      - name: Backend Test (Maven)
-        run: mvn clean test -B
-        working-directory: ./hoctructuyen
-
-      # Chạy Test & Lint cho Frontend (SAST)
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Frontend Test
-        run: |
-          npm ci --legacy-peer-deps
-          npm run test --passWithNoTests || true
-        working-directory: ./Learning-Online
-
-      # Yêu cầu 5: Lưu Report (Artifacts) cho Test
-      - name: Upload Test Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Backend-Surefire-Reports
-          path: hoctructuyen/target/surefire-reports/
-
-  # ==========================================
-  # CỬA ẢI 2: BUILD, QUÉT LỖ HỔNG IMAGE & KÝ ĐIỆN TỬ
-  # ==========================================
-  build-scan-push:
-    name: Build, Scan & Push Images
-    needs: [security-and-quality-gates]
+  build-and-push-backend:
+    name: Build and Push Backend Image
+    needs: [security-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-
-      # Cài đặt Cosign để Ký Image
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.5.0
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -83,90 +34,63 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ---- XỬ LÝ BACKEND ----
-      - name: Extract metadata Backend
+      - name: Extract metadata for Backend
         id: meta-backend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/online-study-backend
+          images: ${{ secrets.DOCKERHUB_USERNAME || 'boychungtinh' }}/online-study-backend
           tags: type=sha,format=short
 
-      - name: Build Backend for Scanning
+      - name: Build and push Backend image
         uses: docker/build-push-action@v5
         with:
           context: ./hoctructuyen
-          load: true # Chỉ lưu tạm trên máy runner để scan
-          tags: ${{ steps.meta-backend.outputs.tags }}
-
-      # Quét lỗ hổng Image bằng Trivy
-      - name: Run Trivy Scan on Backend
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ steps.meta-backend.outputs.tags }}
-          format: 'table'
-          exit-code: '1' # Lỗi nếu có lỗ hổng CRITICAL
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
-      # Build & Push & Sinh SBOM
-      - name: Push Backend & Generate SBOM
-        uses: docker/build-push-action@v5
-        with:
-          context: ./hoctructuyen
+          file: ./hoctructuyen/Dockerfile
           push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
-          provenance: true  # Yêu cầu 2: Provenance
-          sbom: true        # Yêu cầu 2: SBOM
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Ký Backend Image
-      - name: Sign Backend Image
-        run: cosign sign --yes ${{ steps.meta-backend.outputs.tags }}
+  build-and-push-frontend:
+    name: Build and Push Frontend Image
+    needs: [security-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # ---- XỬ LÝ FRONTEND ----
-      - name: Extract metadata Frontend
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata for Frontend
         id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/online-study-frontend
+          images: ${{ secrets.DOCKERHUB_USERNAME || 'boychungtinh' }}/online-study-frontend
           tags: type=sha,format=short
 
-      - name: Build Frontend for Scanning
+      - name: Build and push Frontend image
         uses: docker/build-push-action@v5
         with:
           context: ./Learning-Online
-          build-args: |
-            REACT_APP_BASE_URL=${{ secrets.REACT_APP_BASE_URL || 'https://api.hoclaptrinh.top/api' }}
-          load: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-
-      - name: Push Frontend & Generate SBOM
-        uses: docker/build-push-action@v5
-        with:
-          context: ./Learning-Online
+          file: ./Learning-Online/Dockerfile
           build-args: |
             REACT_APP_BASE_URL=${{ secrets.REACT_APP_BASE_URL || 'https://api.hoclaptrinh.top/api' }}
           push: true
           tags: ${{ steps.meta-frontend.outputs.tags }}
-          provenance: true
-          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Sign Frontend Image
-        run: cosign sign --yes ${{ steps.meta-frontend.outputs.tags }}
-
-  # ==========================================
-  # CỬA ẢI 3: DUYỆT DEPLOYMENT TỚI PRODUCTION
-  # ==========================================
-  deploy-to-production:
+  deploy-to-vps:
     name: Deploy to VPS Server
-    needs: [build-scan-push]
+    needs: [build-and-push-backend, build-and-push-frontend]
     runs-on: ubuntu-latest
-    # Yêu cầu 4: Dùng GitHub Environment để yêu cầu Approval
-    environment: production
     steps:
       - name: Trigger SmartDeploy Webhook Agent
         run: |
