@@ -133,24 +133,55 @@ function saveDeploymentLog(logData) {
 }
 
 /**
- * MODULE HEALTH MONITOR
+ * YÊU CẦU 1 & 2: PRE-DEPLOYMENT READINESS GATE & ABSOLUTE DEADLINE
  */
-async function checkHealth(serviceName, url, maxRetries = 12, delayMs = 5000) {
-  for (let i = 1; i <= maxRetries; i++) {
+async function preDeploymentReadinessGate(serviceName, url, maxWaitMs = 60000, delayMs = 5000) {
+  const startTime = Date.now();
+  const deadline = startTime + maxWaitMs;
+
+  while (Date.now() < deadline) {
     try {
-      console.log(`[Health Monitor] Đang ping ${serviceName} (${url}) (Lần ${i}/${maxRetries})...`);
+      console.log(`[Health Monitor] Đang ping ${serviceName} (${url})... (Timeout còn: ${((deadline - Date.now())/1000).toFixed(1)}s)`);
       const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      
+      let isReady = false;
+      let details = '';
+
       if (response.ok) {
-        console.log(`✅ ${serviceName} đã READY và LIVE! (Status: ${response.status})`);
+        // YÊU CẦU 3: Kiểm tra Body/Status UP thay vì chỉ HTTP 200
+        try {
+          const body = await response.json();
+          if (body.status === 'UP') {
+            isReady = true;
+          } else {
+            details = JSON.stringify(body.components || body);
+          }
+        } catch (e) {
+          // Nếu không phải JSON (VD: Frontend HTML), thì HTTP 200 là đủ
+          isReady = true;
+        }
+      } else {
+        details = `HTTP Status: ${response.status}`;
+      }
+
+      if (isReady) {
+        console.log(`✅ ${serviceName} đã READY và LIVE! (Thời gian thực: ${((Date.now() - startTime)/1000).toFixed(2)}s)`);
         return true;
       }
-      console.warn(`⚠️ ${serviceName} chưa sẵn sàng. (Status: ${response.status})`);
+      
+      console.warn(`⚠️ ${serviceName} chưa sẵn sàng. ${details ? 'Chi tiết: ' + details : ''}`);
     } catch (error) {
       console.warn(`⚠️ Đang chờ ${serviceName} khởi động... (${error.name})`);
     }
+
+    if (Date.now() + delayMs >= deadline) {
+      break; // Yêu cầu 2: Không sleep ở lần cuối nếu vượt deadline
+    }
     await new Promise(res => setTimeout(res, delayMs));
   }
-  throw new Error(`[Health Monitor] 🚨 Mất kết nối! ${serviceName} KHÔNG vượt qua được bài test sức khỏe sau ${maxRetries * delayMs / 1000}s`);
+  
+  const realWaitTime = ((Date.now() - startTime) / 1000).toFixed(2);
+  throw new Error(`[Health Monitor] 🚨 Mất kết nối! ${serviceName} KHÔNG vượt qua được bài test sức khỏe (readiness gate) sau ${realWaitTime}s`);
 }
 
 /**
@@ -191,41 +222,34 @@ async function fetchPrometheusMetric(query) {
 }
 
 /**
- * CANARY ANALYSIS MODULE (MULTI-DIMENSIONAL SMART ROLLBACK)
+ * YÊU CẦU 1 & 4: POST-DEPLOYMENT VERIFICATION & ALERT RULES
  */
-async function canaryAnalysis(candidateColor, durationMs = 120000, checkIntervalMs = 15000) {
+async function postDeploymentVerification(candidateColor, durationMs = 120000, checkIntervalMs = 15000) {
   console.log(`\n[5] BẮT ĐẦU POST-DEPLOYMENT VERIFICATION (${candidateColor.toUpperCase()}) - ${durationMs / 1000}s`);
   const endTime = Date.now() + durationMs;
-  const MIN_REQUESTS_THRESHOLD = 5; // Yêu cầu tối thiểu 5 request/phút để đánh giá
+  const MIN_REQUESTS_THRESHOLD = 5; 
 
   while (Date.now() < endTime) {
     try {
-      // 1. Phân tích Error Rate (5xx) gắn nhãn color
       const error5xxRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{status=~"5..", instance="backend-${candidateColor}:8080"}[1m]))`);
       const totalRequestRate = await fetchPrometheusMetric(`sum(rate(http_server_requests_seconds_count{instance="backend-${candidateColor}:8080"}[1m]))`);
 
-      // Xử lý INCONCLUSIVE: Không có data hoặc Zero Traffic
       if (totalRequestRate === null || totalRequestRate === 0) {
         console.warn(`⚠️ Đang chờ dữ liệu metric từ Prometheus cho ${candidateColor}...`);
-        await new Promise(r => setTimeout(r, checkIntervalMs));
+        if (Date.now() + checkIntervalMs < endTime) await new Promise(r => setTimeout(r, checkIntervalMs));
         continue;
       }
 
-      // Quy đổi sang request/phút
       const requestsPerMin = totalRequestRate * 60;
       if (requestsPerMin < MIN_REQUESTS_THRESHOLD) {
         console.warn(`⚠️ Lưu lượng quá thấp (${requestsPerMin.toFixed(1)} req/m). Đang chờ thêm traffic...`);
-        await new Promise(r => setTimeout(r, checkIntervalMs));
+        if (Date.now() + checkIntervalMs < endTime) await new Promise(r => setTimeout(r, checkIntervalMs));
         continue;
       }
 
       let errorPercentage = (error5xxRate || 0) / totalRequestRate * 100;
-
-      // 2. Phân tích Độ trễ (Latency P95 & P99)
       const p95Latency = await fetchPrometheusMetric(`histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{instance="backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
       const p99Latency = await fetchPrometheusMetric(`histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{instance="backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
-
-      // 3. Phân tích Saturation (Tài nguyên Máy chủ)
       const cpuUsage = (await fetchPrometheusMetric(`process_cpu_usage{instance="backend-${candidateColor}:8080"}`) || 0) * 100;
       const heapUsed = await fetchPrometheusMetric(`sum(jvm_memory_used_bytes{area="heap", instance="backend-${candidateColor}:8080"})`);
       const heapMax = await fetchPrometheusMetric(`sum(jvm_memory_max_bytes{area="heap", instance="backend-${candidateColor}:8080"})`);
@@ -233,21 +257,22 @@ async function canaryAnalysis(candidateColor, durationMs = 120000, checkInterval
 
       console.log(`[Score] Traffic: ${requestsPerMin.toFixed(1)} req/m | Err: ${errorPercentage.toFixed(2)}% | P95: ${(p95Latency * 1000).toFixed(0)}ms | CPU: ${cpuUsage.toFixed(1)}% | Mem: ${memoryUsage.toFixed(1)}%`);
 
-      // Tiêu chí FAIL (Khôi phục)
-      if (errorPercentage > 1.0) return { passed: false, reason: `FAIL: Lỗi 5xx vượt ngưỡng (${errorPercentage.toFixed(2)}%)` };
-      if (p95Latency > 0.500) return { passed: false, reason: `FAIL: P95 Latency vượt ngưỡng 500ms (${(p95Latency * 1000).toFixed(0)}ms)` };
-      if (p99Latency > 0.800) return { passed: false, reason: `FAIL: P99 Latency vượt ngưỡng 800ms (${(p99Latency * 1000).toFixed(0)}ms)` };
+      if (errorPercentage > 1.0) return { passed: false, reason: `FAIL: Lỗi 5xx vượt SLO (${errorPercentage.toFixed(2)}%)` };
+      if (p95Latency > 0.500) return { passed: false, reason: `FAIL: P95 Latency vượt SLO 500ms (${(p95Latency * 1000).toFixed(0)}ms)` };
+      if (p99Latency > 0.800) return { passed: false, reason: `FAIL: P99 Latency vượt SLO 800ms (${(p99Latency * 1000).toFixed(0)}ms)` };
       if (cpuUsage > 80.0) return { passed: false, reason: `FAIL: CPU Usage bão hòa (${cpuUsage.toFixed(1)}%)` };
 
-      await new Promise(res => setTimeout(res, checkIntervalMs));
+      if (Date.now() + checkIntervalMs < endTime) await new Promise(res => setTimeout(res, checkIntervalMs));
     } catch (e) {
-      // INCONCLUSIVE: Prometheus sập hoặc Parse Error -> Fail Closed
-      console.error(`🚨 INCONCLUSIVE ERROR: ${e.message}`);
-      return { passed: false, reason: `INCONCLUSIVE: ${e.message}` };
+      // YÊU CẦU 4: Thêm alert khi Prometheus scrape fail và quy định Auto-action an toàn
+      console.error(`🚨 ALERT: Lỗi nghiêm trọng - Không thể lấy dữ liệu từ Prometheus. Mất khả năng giám sát!`);
+      console.error(`Chi tiết lỗi: ${e.message}`);
+      // Auto-action an toàn: Fail-safe (Trạng thái mù mờ thì tự động Rollback)
+      return { passed: false, reason: `INCONCLUSIVE_FAILSAFE: Prometheus Scrape Failed (${e.message})` };
     }
   }
 
-  console.log(`✅ PASS: Xác minh Post-Deployment thành công!`);
+  console.log(`✅ PASS: Xác minh Post-Deployment thành công! Cửa sổ triển khai khép lại.`);
   return { passed: true, reason: 'PASS' };
 }
 
@@ -338,8 +363,8 @@ async function main(commitSha, sender = 'unknown_sender') {
 
     console.log(`\n[3] Kích hoạt Health Monitor Module...`);
     updateDeploymentState(commitSha, 'HEALTH_CHECK');
-    await checkHealth(`Backend API (${inactiveColor})`, `http://backend-${inactiveColor}:8080/api/actuator/health`);
-    await checkHealth(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
+    await preDeploymentReadinessGate(`Backend API (${inactiveColor})`, `http://backend-${inactiveColor}:8080/api/actuator/health`);
+    await preDeploymentReadinessGate(`Frontend React (${inactiveColor})`, `http://frontend-${inactiveColor}:80/`);
 
     console.log(`\n[4] Chuyển đổi luồng Nginx (Zero-Downtime Switch)...`);
     console.log(`\n[6] Kích hoạt Nginx Zero-Downtime Switch (Atomic Reload)...`);
@@ -349,7 +374,7 @@ async function main(commitSha, sender = 'unknown_sender') {
     console.log(proxyOut2);
 
     updateDeploymentState(commitSha, 'VERIFYING');
-    const canaryResult = await canaryAnalysis(inactiveColor, 120000, 15000); // Truyền candidateColor
+    const canaryResult = await postDeploymentVerification(inactiveColor, 120000, 15000); 
 
     if (canaryResult.passed) {
       console.log(`[+] Mọi thông số ổn định. Bắt đầu vô hiệu hóa luồng cũ (${activeColor.toUpperCase()})...`);
@@ -474,6 +499,46 @@ app.post('/webhook', webhookLimiter, async (req, res) => {
 
   // Kích hoạt luồng chính với thông tin người gửi
   main(commitSha, sender);
+});
+
+// ==========================================
+// YÊU CẦU 4: HỆ THỐNG CONTINUOUS HEALTH MONITORING & AUTO-RUNBOOK
+// Dành cho Grafana/Alertmanager gọi webhook sau khi deploy xong (hết cửa sổ 120s)
+// ==========================================
+app.post('/alert-runbook', async (req, res) => {
+  // Lấy cảnh báo từ Grafana Alerting (Ví dụ: Disk Full, DB Error, 5xx)
+  const alertData = req.body;
+  console.error(`\n🚨 [CONTINUOUS MONITORING ALERT] Nhận cảnh báo nghiêm trọng từ hệ thống giám sát!`);
+  console.error(`Chi tiết: ${JSON.stringify(alertData)}`);
+
+  try {
+    const activeColor = await getActiveColor('backend');
+    const rollbackColor = activeColor === 'blue' ? 'green' : 'blue';
+
+    console.log(`[Auto-Runbook] Tiến hành Failover khẩn cấp sang luồng dự phòng: ${rollbackColor.toUpperCase()}`);
+    
+    // Gửi cảnh báo Slack
+    await sendSlackAlert({
+      status: 'FAILED',
+      application: 'Continuous Monitoring (Grafana)',
+      commit_sha: 'AUTO-FAILOVER',
+      strategy: 'Emergency Rollback',
+      duration_seconds: 0,
+      old_version: activeColor,
+      new_version: rollbackColor,
+      rollback_reason: `Grafana Alert Triggered. Khôi phục tự động về ${rollbackColor}`
+    });
+
+    // Thực thi kịch bản khôi phục (Switch Nginx ngược lại)
+    await runCmd('./scripts/proxy_manager.sh', ['backend_service', `online-study-backend-${rollbackColor}:8080`], { cwd: PROJECT_DIR });
+    await runCmd('./scripts/proxy_manager.sh', ['frontend_service', `online-study-frontend-${rollbackColor}:80`], { cwd: PROJECT_DIR });
+
+    console.log(`✅ [Auto-Runbook] Khôi phục thành công!`);
+    res.status(200).send('Emergency Rollback Executed');
+  } catch (err) {
+    console.error(`[Auto-Runbook] LỖI khi chạy kịch bản cấp cứu: ${err.message}`);
+    res.status(500).send('Emergency Rollback Failed');
+  }
 });
 
 // ==========================================
