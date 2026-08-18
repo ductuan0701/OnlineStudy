@@ -2,8 +2,8 @@
 # Script sao lưu Database dự phòng cho Rollback-safe/Forward-only migrations
 DB_CONTAINER="online-study-db"
 DB_USER="root"
-DB_PASS="online-study"
-DB_NAME="online-study-db"
+DB_PASS="OnlineStudyRootSecret2026!"
+DB_NAME="onlinestudy"
 BACKUP_DIR="/root/online-study/backups"
 
 mkdir -p "$BACKUP_DIR"
