@@ -4,7 +4,7 @@ Tài liệu này hướng dẫn bạn các bước cần làm NGAY LẬP TỨC �
 
 ## BƯỚC 1: THU HỒI VÀ THAY ĐỔI TẤT CẢ SECRET (Khẩn cấp)
 
-Do các mật khẩu đã từng nằm trong mã nguồn và có thể đã bị đánh cắp, bạn BẮT BUỘC phải đổi toàn bộ mật khẩu trên máy chủ thật.
+Do các mật khẩu đã từng nằm trong mã nguồn và có thể đã bị đánh cắp, bạn BẮT BUỘC phải đổi toàn bộ mật khẩu trên máy chủ thật
 
 1. **Mật khẩu MySQL & Grafana**: 
    - Mở file `.env` trên máy chủ và đổi giá trị cho `MYSQL_ROOT_PASSWORD`, `MYSQL_APP_PASSWORD`, `GF_SECURITY_ADMIN_PASSWORD`.
