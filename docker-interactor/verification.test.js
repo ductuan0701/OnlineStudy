@@ -54,7 +54,7 @@ async function runTests() {
   assert.strictEqual(res.passed, false);
   console.log("✅ Test 4: Lỗi 5xx vượt 1% -> FAIL");
 
-  // 5. Mọi chỉ số an toàn (PASS)
+  // 5. Mọi chỉ số an toàn (PASS);
   res = await mockCanaryAnalysis({ totalReq: 10, err5xx: 0.05, p95: 0.3, cpu: 60 });
   assert.strictEqual(res.passed, true);
   console.log("✅ Test 5: Metrics ổn định -> PASS");
