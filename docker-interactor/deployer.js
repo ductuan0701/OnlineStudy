@@ -108,6 +108,9 @@ async function main(commitSha, sender = 'unknown_sender') {
 
     if (canaryResult.passed) {
       console.log(`[+] Mọi thông số ổn định. Bắt đầu vô hiệu hóa luồng cũ (${activeColor.toUpperCase()})...`);
+      if (canaryResult.reason === 'INCONCLUSIVE_PASS') {
+        deploymentStatus = 'INCONCLUSIVE_PASS';
+      }
     } else {
       rollbackReason = canaryResult.reason;
       deploymentStatus = 'ROLLED_BACK';

@@ -7,10 +7,22 @@ async function sendSlackAlert(logData) {
   if (!SLACK_WEBHOOK_URL) return;
 
   const isSuccess = logData.status === 'SUCCESS';
+  const isInconclusive = logData.status === 'INCONCLUSIVE_PASS';
+  
+  let color = '#ff0000';
+  let title = '🚨 SmartDeploy Rollback';
+  if (isSuccess) {
+    color = '#36a64f';
+    title = '✅ SmartDeploy Success';
+  } else if (isInconclusive) {
+    color = '#ffcc00';
+    title = '⚠️ SmartDeploy Pass (Low Traffic)';
+  }
+
   const payload = {
     attachments: [{
-      color: isSuccess ? '#36a64f' : '#ff0000',
-      title: isSuccess ? '✅ SmartDeploy Success' : '🚨 SmartDeploy Rollback',
+      color: color,
+      title: title,
       fields: [
         { title: 'Application', value: logData.application, short: true },
         { title: 'Version', value: logData.commit_sha, short: true },
@@ -22,7 +34,7 @@ async function sendSlackAlert(logData) {
     }]
   };
 
-  if (!isSuccess && logData.rollback_reason) {
+  if (!isSuccess && !isInconclusive && logData.rollback_reason) {
     payload.attachments[0].fields.push({ title: 'Reason', value: logData.rollback_reason, short: false });
   }
 

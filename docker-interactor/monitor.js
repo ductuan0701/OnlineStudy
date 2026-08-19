@@ -83,6 +83,7 @@ async function postDeploymentVerification(candidateColor, durationMs = 120000, c
   console.log(`\n[5] BẮT ĐẦU POST-DEPLOYMENT VERIFICATION (${candidateColor.toUpperCase()}) - ${durationMs / 1000}s`);
   const endTime = Date.now() + durationMs;
   const MIN_REQUESTS_THRESHOLD = 5; 
+  let hadSufficientTraffic = false;
 
   while (Date.now() < endTime) {
     try {
@@ -101,6 +102,8 @@ async function postDeploymentVerification(candidateColor, durationMs = 120000, c
         if (Date.now() + checkIntervalMs < endTime) await new Promise(r => setTimeout(r, checkIntervalMs));
         continue;
       }
+
+      hadSufficientTraffic = true;
 
       let errorPercentage = (error5xxRate || 0) / totalRequestRate * 100;
       const p95Latency = await fetchPrometheusMetric(`histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{instance="backend-${candidateColor}:8080"}[1m])) by (le))`) || 0;
@@ -124,7 +127,12 @@ async function postDeploymentVerification(candidateColor, durationMs = 120000, c
     }
   }
 
-  console.log(`✅ PASS: Xác minh Post-Deployment thành công! Cửa sổ triển khai khép lại.`);
+  if (!hadSufficientTraffic) {
+    console.log(`✅ INCONCLUSIVE PASS: Triển khai thành công nhưng lượng traffic quá thấp để đo lường SLO.`);
+    return { passed: true, reason: 'INCONCLUSIVE_PASS' };
+  }
+
+  console.log(`✅ PASS: Xác minh Post-Deployment thành công với SLO đạt chuẩn! Cửa sổ triển khai khép lại.`);
   return { passed: true, reason: 'PASS' };
 }
 
