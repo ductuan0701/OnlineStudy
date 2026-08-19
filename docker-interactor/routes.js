@@ -180,7 +180,7 @@ function setupRoutes(app, webhookLimiter) {
         <div class="container">
           <div class="header">
             <h1><i class="fa-solid fa-rocket"></i> SmartDeploy Enterprise</h1>
-            <p>Hệ thống giám sát vòng đời triển khai liên tục (Blue-Green Deployment)</p>
+            <p>Hệ thống giám sát vòng đời triển khai liên tục (Blue-Green & Canary)</p>
           </div>
           <div class="table-responsive">
             <table>
