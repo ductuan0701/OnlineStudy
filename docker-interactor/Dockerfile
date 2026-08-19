@@ -10,7 +10,7 @@ RUN apk add --no-cache docker-cli docker-cli-compose
 # Copy các file cấu hình package
 COPY package*.json ./
 
-# Cài đặt thư viện (chỉ production);
+# Cài đặt thư viện (chỉ production)
 RUN npm install --only=production
 
 # Copy toàn bộ mã nguồn
