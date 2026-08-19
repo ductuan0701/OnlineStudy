@@ -113,7 +113,7 @@ async function postDeploymentVerification(candidateColor, durationMs = 120000, c
       const heapUsed = await fetchPrometheusMetric(`sum(jvm_memory_used_bytes{area="heap", instance="backend-${candidateColor}:8080"})`);
       const memoryUsage = heapMax > 0 ? ((heapUsed || 0) / heapMax) * 100 : 0;
 
-      console.log(`[Score] Traffic: ${requestsPerMin.toFixed(1)} req/m | Err: ${errorPercentage.toFixed(2)}% | P95: ${(p95Latency * 1000).toFixed(0)}ms | CPU: ${cpuUsage.toFixed(1)}% | Mem: ${memoryUsage.toFixed(1)}%`);
+      console.log(`[Score] Traffic: ${requestsPerMin.toFixed(1)} req/m | Err: ${errorPercentage.toFixed(2)}% | P95: ${(p95Latency * 1000).toFixed(0)}ms | P99: ${(p99Latency * 1000).toFixed(0)}ms | CPU: ${cpuUsage.toFixed(1)}% | Mem: ${memoryUsage.toFixed(1)}%`);
 
       if (errorPercentage > 1.0) return { passed: false, reason: `FAIL: Lỗi 5xx vượt SLO (${errorPercentage.toFixed(2)}%)` };
       if (p95Latency > 0.500) return { passed: false, reason: `FAIL: P95 Latency vượt SLO 500ms (${(p95Latency * 1000).toFixed(0)}ms)` };
