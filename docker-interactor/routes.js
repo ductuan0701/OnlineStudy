@@ -117,9 +117,12 @@ function setupRoutes(app, webhookLimiter) {
           <a href="https://github.com/ductuan0701/OnlineStudy/commit/${log.commit_sha}" target="_blank" class="commit-link">
             <i class="fa-brands fa-github"></i> ${log.commit_sha.substring(0, 7)}
           </a>
-          <br/><small class="text-muted">${log.image_tag || 'latest'}</small>
+          <br/><small class="text-muted" style="margin-top: 4px; display: inline-block;"><i class="fa-solid fa-user"></i> ${log.sender || 'System'}</small>
         </td>
-        <td class="text-center nowrap"><span class="flow-badge">${(log.old_version || '?').toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${(log.new_version || '?').toUpperCase()}</span></td>
+        <td class="text-center nowrap">
+          <span class="flow-badge">${(log.old_version || '?').toUpperCase()} <i class="fa-solid fa-arrow-right"></i> ${(log.new_version || '?').toUpperCase()}</span>
+          <br/><small class="text-info" style="font-weight: 600; font-size: 11px; margin-top: 4px; display: inline-block;"><i class="fa-solid fa-database"></i> Schema: ${log.schema_version || 'v1.0'}</small>
+        </td>
         <td class="text-center font-weight-bold nowrap">${log.duration_seconds !== undefined ? log.duration_seconds + 's' : '<i class="fa-solid fa-spinner fa-spin text-muted"></i>'}</td>
         <td class="text-center nowrap">
           <span class="badge ${log.status === 'SUCCESS' ? 'badge-success' : (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'badge-danger' : log.status === 'QUEUED' ? 'badge-warning' : 'badge-info'}">
@@ -177,18 +180,18 @@ function setupRoutes(app, webhookLimiter) {
         <div class="container">
           <div class="header">
             <h1><i class="fa-solid fa-rocket"></i> SmartDeploy Enterprise</h1>
-            <p>Hệ thống giám sát vòng đời triển khai liên tục (Blue-Green & Canary)</p>
+            <p>Hệ thống giám sát vòng đời triển khai liên tục (Blue-Green Deployment)</p>
           </div>
           <div class="table-responsive">
             <table>
               <thead>
                 <tr>
                   <th class="text-center">Thời gian</th>
-                  <th class="text-center">Commit & Tag</th>
-                  <th class="text-center">Luồng</th>
+                  <th class="text-center">Commit & Tác giả</th>
+                  <th class="text-center">Luồng & DB Schema</th>
                   <th class="text-center">Thời lượng</th>
                   <th class="text-center">Trạng thái</th>
-                  <th class="text-center">Rollback Log</th>
+                  <th class="text-center">Ghi chú</th>
                 </tr>
               </thead>
               <tbody>

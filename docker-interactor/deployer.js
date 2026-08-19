@@ -104,17 +104,17 @@ async function main(commitSha, sender = 'unknown_sender') {
     console.log(proxyOut2);
 
     updateDeploymentState(commitSha, 'VERIFYING');
-    const canaryResult = await postDeploymentVerification(inactiveColor, 120000, 15000); 
-
-    if (canaryResult.passed) {
+    const verifyResult = await postDeploymentVerification(inactiveColor, 120000, 15000); 
+    
+    if (verifyResult.passed) {
       console.log(`[+] Mọi thông số ổn định. Bắt đầu vô hiệu hóa luồng cũ (${activeColor.toUpperCase()})...`);
-      if (canaryResult.reason === 'INCONCLUSIVE_PASS') {
+      if (verifyResult.reason === 'INCONCLUSIVE_PASS') {
         deploymentStatus = 'INCONCLUSIVE_PASS';
       }
     } else {
-      rollbackReason = canaryResult.reason;
+      rollbackReason = verifyResult.reason;
       deploymentStatus = 'ROLLED_BACK';
-      console.log(`\n[!] CẢNH BÁO: HỆ THỐNG GẶP LỖI (${canaryResult.reason})`);
+      console.log(`\n[!] CẢNH BÁO: HỆ THỐNG GẶP LỖI (${verifyResult.reason})`);
       console.log(`[!] TIẾN HÀNH ROLLBACK (Khôi phục Nginx về ${activeColor.toUpperCase()})...`);
       
       await runCmd('./scripts/proxy_manager.sh', ['backend_service', `online-study-backend-${activeColor}:8080`], { cwd: PROJECT_DIR });
@@ -143,9 +143,11 @@ async function main(commitSha, sender = 'unknown_sender') {
       application: 'Online Study Backend',
       commit_sha: commitSha,
       image_tag: `sha-${commitSha.substring(0, 7)}`,
+      sender: sender,
       old_version: activeColor,
       new_version: inactiveColor,
-      strategy: 'Blue-Green / Canary',
+      schema_version: schemaVersion,
+      strategy: 'Blue-Green / Verification',
       start_time: new Date(startTime).toISOString(),
       end_time: new Date(endTime).toISOString(),
       duration_seconds: Math.round((endTime - startTime) / 1000),
