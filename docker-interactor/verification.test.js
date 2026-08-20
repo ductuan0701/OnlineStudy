@@ -39,7 +39,7 @@ async function runTests() {
   assert.strictEqual(res.passed, false);
   console.log("✅ Test 1: Zero Traffic -> Fail-Closed (INCONCLUSIVE)");
 
-  // 2. NaN / Parse Error
+  // 2. NaN / Parse Erro
   res = await mockCanaryAnalysis({ totalReq: NaN, err5xx: 0 });
   assert.strictEqual(res.passed, false);
   console.log("✅ Test 2: Kết quả NaN / Parse Error -> Fail-Closed (INCONCLUSIVE)");
