@@ -12,7 +12,7 @@ sudo systemctl restart systemd-timesyncd
 
 # Hiển thị trạng thái đồng bộ
 echo "=== TRẠNG THÁI ĐỒNG BỘ THỜI GIAN ==="
-timedatectl status | grep "Time synchronized"
+timedatectl status | grep -i "synchronized"
 
 echo "=== SO SÁNH GIỜ UTC HIỆN TẠI ==="
 date -u +"%Y-%m-%dT%H:%M:%SZ"
