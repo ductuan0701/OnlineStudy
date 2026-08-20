@@ -34,7 +34,7 @@ async function mockCanaryAnalysis(scenarioConfig) {
 async function runTests() {
   console.log("=== BẮT ĐẦU CHẠY UNIT TEST (SMART ROLLBACK) ===\n");
 
-  // 1. Zero Traffic (No Data)
+  // 1. Zero Traffic (No Data
   let res = await mockCanaryAnalysis({ totalReq: 0, err5xx: 0, p95: 0.1, cpu: 20 });
   assert.strictEqual(res.passed, false);
   console.log("✅ Test 1: Zero Traffic -> Fail-Closed (INCONCLUSIVE)");
