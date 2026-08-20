@@ -3,8 +3,8 @@ import { check, sleep } from 'k6';
 
 export const options = {
   stages: [
-    { duration: '30s', target: 200 },
-    { duration: '3m', target: 200 },
+    { duration: '30s', target: 5000 },
+    { duration: '3m', target: 5000 },
     { duration: '30s', target: 0 },
   ],
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(50)', 'p(95)', 'p(99)', 'count'],
