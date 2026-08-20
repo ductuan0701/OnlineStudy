@@ -3,8 +3,8 @@ import { check, sleep } from 'k6';
 
 export const options = {
   stages: [
-    { duration: '30s', target: 500 },
-    { duration: '3m', target: 500 },
+    { duration: '30s', target: 5000 },
+    { duration: '3m', target: 5000 },
     { duration: '30s', target: 0 },
   ],
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(50)', 'p(95)', 'p(99)', 'count'],
@@ -17,7 +17,8 @@ export const options = {
 };
 
 export default function () {
-  const res = http.get('https://api.hoclaptrinh.top/api/actuator/health', {
+  // Kịch bản 2: Gọi vào đường dẫn cố tình ném lỗi 500 (HTTP 500)
+  const res = http.get('https://api.hoclaptrinh.top/api/courses/error-test', {
     headers: { 'Connection': 'keep-alive' }
   });
   check(res, {

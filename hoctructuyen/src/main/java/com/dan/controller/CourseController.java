@@ -36,6 +36,19 @@ public class CourseController {
     @Autowired
     private Course_UserSubService course_userSubService;
 
+    @GetMapping("/latency-test")
+    public ResponseEntity<String> latencyTest() throws InterruptedException {
+        // Cố tình làm chậm 600ms để lố ngưỡng P95 < 500ms của hệ thống Canary
+        Thread.sleep(600);
+        return new ResponseEntity<>("Chậm quá, Rollback đi!", HttpStatus.OK);
+    }
+
+    @GetMapping("/error-test")
+    public ResponseEntity<String> errorTest() {
+        // Cố tình ném Exception để tạo HTTP 500 Internal Server Error
+        throw new RuntimeException("Lỗi hệ thống ngầm định! Đề nghị Rollback khẩn cấp!");
+    }
+
     @GetMapping("")
     public ResponseEntity<Page<Course>> getAllCourses(@RequestParam(value = "keyword", defaultValue = "") String keyword,
                                                       @RequestParam(value = "category", defaultValue = "") String kCategory,
