@@ -129,7 +129,9 @@ function setupRoutes(app, webhookLimiter) {
             <i class="fa-solid ${log.status === 'SUCCESS' ? 'fa-circle-check' : (log.status === 'FAILED' || log.status === 'ROLLED_BACK') ? 'fa-circle-xmark' : 'fa-circle-notch fa-spin'}"></i> ${log.status}
           </span>
         </td>
-        <td class="text-danger font-italic ${log.rollback_reason ? 'rollback-cell' : 'text-center'}"><small>${log.rollback_reason || '-'}</small></td>
+        <td class="text-center">
+          ${log.rollback_reason ? `<div class="note-box">${log.rollback_reason}</div>` : '<span class="text-muted">-</span>'}
+        </td>
       </tr>
     `).join('');
 
@@ -163,7 +165,7 @@ function setupRoutes(app, webhookLimiter) {
           .font-weight-bold { font-weight: 600; }
           .font-italic { font-style: italic; }
           .nowrap { white-space: nowrap; }
-          .rollback-cell { text-align: left; max-width: 300px; line-height: 1.5; }
+          .note-box { text-align: left; max-width: 320px; line-height: 1.5; font-size: 12px; color: #dc2626; background-color: #fef2f2; padding: 8px 12px; border-radius: 6px; border: 1px solid #fecaca; word-break: break-word; margin: 0 auto; }
           .py-5 { padding-top: 3rem; padding-bottom: 3rem; }
           .badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.3px; white-space: nowrap; }
           .badge-success { background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
@@ -180,7 +182,7 @@ function setupRoutes(app, webhookLimiter) {
         <div class="container">
           <div class="header">
             <h1><i class="fa-solid fa-rocket"></i> SmartDeploy Enterprise</h1>
-            <p>Hệ thống giám sát vòng đời triển khai liên tục (Blue-Green & Canary)</p>
+            <p>Hệ thống giám sát vòng đời triển khai liên tục (Blue-Green Deployment)</p>
           </div>
           <div class="table-responsive">
             <table>

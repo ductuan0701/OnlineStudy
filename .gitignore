@@ -17,3 +17,4 @@ Thumbs.db
 # Dynamic state files modified by CI/CD
 nginx/upstreams.conf
 docker-interactor/deployments.json
+tests/load_test/*.csv

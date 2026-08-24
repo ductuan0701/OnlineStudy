@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Kết quả Load Test (3 Lần)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; }
+        .container { display: flex; justify-content: space-around; flex-wrap: wrap; }
+        .chart-box { width: 45%; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;}
+        h1 { text-align: center; color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Biểu Đồ Đánh Giá Hiệu Năng Triển Khai (3 Lần Chạy Lặp Lại)</h1>
+    <div class="container">
+        <div class="chart-box">
+            <canvas id="latencyChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <canvas id="successChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const ctx1 = document.getElementById('latencyChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['Lần 1', 'Lần 2', 'Lần 3'],
+                datasets: [
+                    { label: 'P50 (Trung vị) ms', data: [229.36, 262.18, 266.16], backgroundColor: '#36A2EB' },
+                    { label: 'Độ lệch chuẩn ms', data: [349.61, 443.26, 157.74], backgroundColor: '#FFCE56' },
+                    { label: 'P95 ms', data: [920.42, 737.55, 521.64], backgroundColor: '#FF6384' },
+                    { label: 'P99 ms', data: [2114.64, 2309.68, 898.45], backgroundColor: '#9966FF' }
+                ]
+            },
+            options: { responsive: true, plugins: { title: { display: true, text: 'Độ trễ & Biến động (Latency)' } } }
+        });
+
+        const ctx2 = document.getElementById('successChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: ['Lần 1', 'Lần 2', 'Lần 3'],
+                datasets: [
+                    { label: 'Tổng số Request', data: [158847, 154386, 160842], borderColor: '#4BC0C0', tension: 0.1, yAxisID: 'y' },
+                    { label: 'Request Thất bại (Lỗi)', data: [0, 3, 0], borderColor: '#FF0000', tension: 0.1, yAxisID: 'y1' }
+                ]
+            },
+            options: { 
+                responsive: true, 
+                plugins: { title: { display: true, text: 'Tỷ lệ thành công (Reliability)' } },
+                scales: {
+                    y: { type: 'linear', display: true, position: 'left', title: {display: true, text: 'Tổng Request'} },
+                    y1: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Lỗi'}, grid: {drawOnChartArea: false} }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
