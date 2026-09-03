@@ -72,6 +72,11 @@ function setupRoutes(app, webhookLimiter) {
     console.error(`\n🚨 [CONTINUOUS MONITORING ALERT] Nhận cảnh báo nghiêm trọng từ hệ thống giám sát!`);
     console.error(`Chi tiết: ${JSON.stringify(alertData)}`);
 
+    if (alertData.status === 'resolved') {
+      console.log(`[Auto-Runbook] 🟢 Nhận được tín hiệu báo TỐT (Resolved) từ Grafana. Bỏ qua lệnh gạt luồng!`);
+      return res.status(200).send('Resolved alert ignored');
+    }
+
     try {
       const activeColor = await getActiveColor('backend');
       const rollbackColor = activeColor === 'blue' ? 'green' : 'blue';
