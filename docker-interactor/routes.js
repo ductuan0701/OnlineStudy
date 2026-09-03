@@ -76,6 +76,9 @@ function setupRoutes(app, webhookLimiter) {
       const activeColor = await getActiveColor('backend');
       const rollbackColor = activeColor === 'blue' ? 'green' : 'blue';
 
+      console.log(`[Auto-Runbook] Đánh thức container dự phòng (${rollbackColor.toUpperCase()}) đang ngủ...`);
+      await runCmd('docker', ['compose', '-f', 'docker-compose.prod.yml', 'start', `backend-${rollbackColor}`, `frontend-${rollbackColor}`], { cwd: PROJECT_DIR });
+
       console.log(`[Auto-Runbook] Tiến hành Failover khẩn cấp sang luồng dự phòng: ${rollbackColor.toUpperCase()}`);
       
       await sendSlackAlert({
