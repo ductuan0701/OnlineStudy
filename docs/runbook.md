@@ -44,7 +44,7 @@ Tài liệu này chứa các quy trình xử lý sự cố (Runbook) cho các c�
 ### Các bước xử lý:
 1. **[TỰ ĐỘNG] Smart Rollback Orchestrator:**
    - Hệ thống Grafana sẽ tự động bắn Webhook về endpoint `/alert-runbook`.
-   - Webhook Agent sẽ tự động chuyển hướng traffic (Failover) về phiên bản dự phòng (Blue/Green) ngay lập tức để cứu hệ thống.
+   - Webhook Agent sẽ tự động **đánh thức (start)** phiên bản dự phòng (Blue/Green) đang ngủ đông, sau đó chuyển hướng traffic (Failover) về phiên bản này ngay lập tức để cứu hệ thống (Thời gian gián đoạn < 1 giây).
 2. **Kiểm tra sau sự cố (Post-mortem):**
    - Kiểm tra log Backend của container bị lỗi để tìm nguyên nhân (thường là NullPointerException hoặc mất kết nối DB).
    - Kiểm tra lịch sử tự động Rollback tại: `https://deploydb.hoclaptrinh.top/history`
