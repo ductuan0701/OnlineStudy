@@ -92,6 +92,20 @@ function setupRoutes(app, webhookLimiter) {
         rollback_reason: `Grafana Alert Triggered. Khôi phục tự động về ${rollbackColor}`
       });
 
+      const { updateDeploymentState } = require('./state');
+      updateDeploymentState('AUTO-FAILOVER', 'FAILED', {
+        application: 'Continuous Monitoring (Grafana)',
+        image_tag: 'EMERGENCY_ROLLBACK',
+        sender: 'Grafana Alertmanager',
+        old_version: activeColor,
+        new_version: rollbackColor,
+        schema_version: 'v1.0',
+        strategy: 'Emergency Rollback',
+        end_time: new Date().toISOString(),
+        duration_seconds: 0,
+        rollback_reason: `Grafana Alert Triggered. Khôi phục tự động về ${rollbackColor}`
+      });
+
       await runCmd('./scripts/proxy_manager.sh', ['backend_service', `online-study-backend-${rollbackColor}:8080`], { cwd: PROJECT_DIR });
       await runCmd('./scripts/proxy_manager.sh', ['frontend_service', `online-study-frontend-${rollbackColor}:80`], { cwd: PROJECT_DIR });
 
