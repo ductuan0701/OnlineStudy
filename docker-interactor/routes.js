@@ -6,6 +6,9 @@ const { main } = require('./deployer');
 const { sendSlackAlert, runCmd } = require('./utils');
 const { getActiveColor } = require('./monitor');
 
+let lastRollbackTime = 0;
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 phút
+
 function setupRoutes(app, webhookLimiter) {
   
   app.post('/webhook', webhookLimiter, async (req, res) => {
@@ -77,6 +80,11 @@ function setupRoutes(app, webhookLimiter) {
       return res.status(200).send('Resolved alert ignored');
     }
 
+    if (Date.now() - lastRollbackTime < COOLDOWN_MS) {
+      console.error(`🚨 [CẢNH BÁO ĐỎ] Cả hai môi trường Blue và Green đều đang lỗi (Double Fault)! Bỏ qua Rollback tự động để tránh vòng lặp (Flapping). Cần kỹ sư can thiệp thủ công!`);
+      return res.status(429).send('Cooldown active: Both environments failed');
+    }
+
     try {
       const activeColor = await getActiveColor('backend');
       const rollbackColor = activeColor === 'blue' ? 'green' : 'blue';
@@ -114,6 +122,7 @@ function setupRoutes(app, webhookLimiter) {
       await runCmd('./scripts/proxy_manager.sh', ['backend_service', `online-study-backend-${rollbackColor}:8080`], { cwd: PROJECT_DIR });
       await runCmd('./scripts/proxy_manager.sh', ['frontend_service', `online-study-frontend-${rollbackColor}:80`], { cwd: PROJECT_DIR });
 
+      lastRollbackTime = Date.now();
       console.log(`✅ [Auto-Runbook] Khôi phục thành công!`);
       res.status(200).send('Emergency Rollback Executed');
     } catch (err) {
