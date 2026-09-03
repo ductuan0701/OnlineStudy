@@ -18,6 +18,7 @@ function setupRoutes(app, webhookLimiter) {
 
     const commitSha = req.body?.workflow_run?.head_commit?.id || req.body?.after || req.body?.pull_request?.head?.sha || req.body?.commit_sha || 'unknown_commit';
     const sender = req.body?.sender?.login || 'unknown_sender';
+    const commitMessage = req.body?.workflow_run?.head_commit?.message || req.body?.head_commit?.message || '';
 
     if (event === 'workflow_run') {
       if (req.body.action !== 'completed' || req.body.workflow_run?.conclusion !== 'success') {
@@ -28,7 +29,7 @@ function setupRoutes(app, webhookLimiter) {
 
     if (GlobalState.isDeploying) {
       console.log(`[Webhook] 🟡 Đưa vào hàng đợi (QUEUED): Tiến trình khác đang chạy!`);
-      GlobalState.deploymentQueue.push({ commitSha, sender });
+      GlobalState.deploymentQueue.push({ commitSha, sender, commitMessage });
       updateDeploymentState(commitSha, 'QUEUED');
       return res.status(202).send('Queued');
     }
@@ -67,7 +68,7 @@ function setupRoutes(app, webhookLimiter) {
     console.log(`\n[Webhook] 🟢 Tín hiệu HỢP LỆ! (Event: ${event} | Actor: ${sender} | Commit: ${commitSha} | ID: ${deliveryId})`);
     res.status(200).send('Webhook received! Starting SmartDeploy pipeline...');
 
-    main(commitSha, sender);
+    main(commitSha, sender, commitMessage);
   });
 
   app.post('/alert-runbook', async (req, res) => {

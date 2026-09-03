@@ -9,10 +9,10 @@ const { preDeploymentReadinessGate, getActiveColor, postDeploymentVerification }
 function processQueue() {
   if (GlobalState.isDeploying || GlobalState.deploymentQueue.length === 0) return;
   const nextJob = GlobalState.deploymentQueue.shift();
-  main(nextJob.commitSha, nextJob.sender);
+  main(nextJob.commitSha, nextJob.sender, nextJob.commitMessage);
 }
 
-async function main(commitSha, sender = 'unknown_sender') {
+async function main(commitSha, sender = 'unknown_sender', commitMessage = '') {
   GlobalState.isDeploying = true;
   updateDeploymentState(commitSha, 'PREPARING');
   console.log(`=== BẮT ĐẦU TIẾN TRÌNH ZERO-DOWNTIME DEPLOY (Commit: ${commitSha}) ===`);
@@ -38,20 +38,27 @@ async function main(commitSha, sender = 'unknown_sender') {
 
     schemaVersion = "v1.0";
     let configVersion = "v1.0";
-    try {
-      console.log(`\n[+] Đang truy xuất cấu hình Version từ Github (Commit: ${commitSha})...`);
-      const versionUrl = `https://raw.githubusercontent.com/ductuan0701/OnlineStudy/${commitSha}/version.json`;
-      const response = await fetch(versionUrl);
-      if (response.ok) {
-        const versionData = await response.json();
-        schemaVersion = versionData.schema_version || "v1.0";
-        configVersion = versionData.config_version || "v1.0";
-        console.log(`[+] Đã tìm thấy cấu hình: Schema=${schemaVersion}, Config=${configVersion}`);
-      } else {
-        console.log(`[+] Không tìm thấy file version.json. Dùng mặc định (v1.0).`);
+
+    const schemaMatch = commitMessage.match(/\[schema:(v[\d\.]+)\]/i);
+    if (schemaMatch && schemaMatch[1]) {
+      schemaVersion = schemaMatch[1];
+      console.log(`\n[+] Tìm thấy Schema Version từ Commit Message: ${schemaVersion}`);
+    } else {
+      try {
+        console.log(`\n[+] Đang truy xuất cấu hình Version từ Github (Commit: ${commitSha})...`);
+        const versionUrl = `https://raw.githubusercontent.com/ductuan0701/OnlineStudy/${commitSha}/version.json`;
+        const response = await fetch(versionUrl);
+        if (response.ok) {
+          const versionData = await response.json();
+          schemaVersion = versionData.schema_version || "v1.0";
+          configVersion = versionData.config_version || "v1.0";
+          console.log(`[+] Đã tìm thấy cấu hình: Schema=${schemaVersion}, Config=${configVersion}`);
+        } else {
+          console.log(`[+] Không tìm thấy file version.json. Dùng mặc định (v1.0).`);
+        }
+      } catch (e) {
+        console.log(`[+] Lỗi đọc version.json: ${e.message}. Dùng mặc định (v1.0).`);
       }
-    } catch (e) {
-      console.log(`[+] Lỗi đọc version.json: ${e.message}. Dùng mặc định (v1.0).`);
     }
 
     const manifestDir = path.join(PROJECT_DIR, 'manifests');
