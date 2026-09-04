@@ -8,7 +8,7 @@ const GlobalState = {
   isDeploying: false,
   deploymentQueue: []
 };
-
+//adwdwwa
 function updateDeploymentState(commitSha, state, extra = {}) {
   try {
     let deployments = [];
@@ -37,3 +37,4 @@ function updateDeploymentState(commitSha, state, extra = {}) {
 module.exports = {
   processedDeliveries, MAX_PROCESSED, GlobalState, updateDeploymentState
 };
+/* *Hello World */
